@@ -1,4 +1,7 @@
+'use strict';
 
-// The 'bindings' helper will try all the well-known paths that the module might compile to based on platform / version / debug / etc
-module.exports = require('bindings')('segfault-handler');
+const { bin } = require('addon-tools-raub');
 
+const core = require(`./${bin}/segfault`);
+
+module.exports = core;
