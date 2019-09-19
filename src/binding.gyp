@@ -35,14 +35,11 @@
 						'VCCLCompilerTool' : {
 							'DisableSpecificWarnings': ['4996'],
 							'AdditionalOptions' : [
-								'/O2','/Oy','/GL','/GF','/Gm-',
-								'/EHsc','/MT','/GS','/Gy','/GR-','/Gd',
-								# '/O2','/GL','/Gm-', '/Fm-','/EHsc'
+								'/GL', '/GF', '/EHsc', '/GS', '/Gy', '/GR-',
 							]
 						},
 						'VCLinkerTool' : {
-							'AdditionalOptions' : ['/OPT:REF','/OPT:ICF','/LTCG'],
-							# 'AdditionalOptions' : ['/RELEASE','/OPT:REF','/OPT:ICF','/LTCG'],
+							'AdditionalOptions' : ['/DEBUG:NONE'],
 						},
 					},
 				},

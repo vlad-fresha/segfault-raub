@@ -117,7 +117,7 @@ __attribute__ ((noinline))
 __declspec(noinline)
 #endif
 void segfault_stack_frame_1() {
-	int *foo = (int*)1;
+	int *foo = reinterpret_cast<int*>(1);
 	fprintf(stderr, "SegfaultHandler: about to dereference NULL (will cause a SIGSEGV)\n");
 	*foo = 78; // trigger a SIGSEGV
 }

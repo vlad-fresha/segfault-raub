@@ -107,7 +107,8 @@ public:
 		pSLM = (tSLM) GetProcAddress(m_hDbhHelp, "SymLoadModule64");
 		pSGSP =(tSGSP) GetProcAddress(m_hDbhHelp, "SymGetSearchPath");
 		
-		if (pSC == NULL || pSFTA == NULL || pSGMB == NULL || pSGMI == NULL ||
+		if (
+			pSC == NULL || pSFTA == NULL || pSGMB == NULL || pSGMI == NULL ||
 			pSGO == NULL || pSGSFA == NULL || pSI == NULL || pSSO == NULL ||
 			pSW == NULL || pUDSN == NULL || pSLM == NULL
 		) {
@@ -118,10 +119,12 @@ public:
 		}
 		
 		// SymInitialize
-		if (szSymPath != NULL)
+		if (szSymPath != NULL) {
 			m_szSymPath = _strdup(szSymPath);
-		if (this->pSI(m_hProcess, m_szSymPath, FALSE) == FALSE)
+		}
+		if (this->pSI(m_hProcess, m_szSymPath, FALSE) == FALSE) {
 			GetLastError();
+		}
 		
 		DWORD symOptions = this->pSGO();  // SymGetOptions
 		symOptions |= SYMOPT_LOAD_LINES;
@@ -132,16 +135,16 @@ public:
 		
 		char buf[StackWalker::STACKWALK_MAX_NAMELEN] = {0};
 		if (this->pSGSP != NULL) {
-			if (this->pSGSP(m_hProcess, buf, StackWalker::STACKWALK_MAX_NAMELEN) == FALSE)
+			if (
+				this->pSGSP(m_hProcess, buf, StackWalker::STACKWALK_MAX_NAMELEN) == FALSE
+			) {
 				GetLastError();
+			}
 		}
-		char szUserName[1024] = {0};
-		DWORD dwSize = 1024;
-		GetUserNameA(szUserName, &dwSize);
-		this->m_parent->OnSymInit(buf, symOptions, szUserName);
 		
 		return TRUE;
 	}
+	
 	
 	StackWalker *m_parent;
 	
@@ -380,7 +383,7 @@ private:
 			goto cleanup;
 		}
 		
-		if (! pEPM(hProcess, hMods, TTBUFLEN, &cbNeeded)) {
+		if (!pEPM(hProcess, hMods, TTBUFLEN, &cbNeeded)) {
 			//_ftprintf(fLogFile, _T("%lu: EPM failed, GetLastError = %lu\n"), g_dwShowCount, gle);
 			goto cleanup;
 		}
@@ -542,7 +545,8 @@ public:
 //    }
 		// could not retrive the bigger structure, try with the smaller one (as defined in VC7.1)...
 		pModuleInfo->SizeOfStruct = sizeof(IMAGEHLP_MODULE64_V2);
-		void *pData = malloc(4096); // reserve enough memory, so the bug in v6.3.5.1 does not lead to memory-overwrites...
+		// reserve enough memory, so the bug in v6.3.5.1 does not lead to memory-overwrites...
+		void *pData = malloc(4096);
 		if (pData == NULL) {
 			SetLastError(ERROR_NOT_ENOUGH_MEMORY);
 			return FALSE;
@@ -696,8 +700,10 @@ BOOL StackWalker::LoadModules() {
 	
 	// First Init the whole stuff...
 	BOOL bRet = this->m_sw->Init(szSymPath);
-	if (szSymPath != NULL)
-		free(szSymPath); szSymPath = NULL;
+	if (szSymPath != NULL) {
+		free(szSymPath);
+		szSymPath = NULL;
+	}
 		
 	if (bRet == FALSE) {
 		GetLastError();
@@ -817,7 +823,7 @@ BOOL StackWalker::ShowCallstack(
 		// deeper frame could not be found.
 		// CONTEXT need not to be suplied if imageTyp is IMAGE_FILE_MACHINE_I386!
 		if (
-			! this->m_sw->pSW(
+			!this->m_sw->pSW(
 				imageType,
 				this->m_hProcess,
 				hThread,
@@ -861,8 +867,12 @@ BOOL StackWalker::ShowCallstack(
 				// TODO: Mache dies sicher...!
 				strcpy_s(csEntry.name, pSym->Name);
 				// UnDecorateSymbolName()
-				this->m_sw->pUDSN(pSym->Name, csEntry.undName, STACKWALK_MAX_NAMELEN, UNDNAME_NAME_ONLY);
-				this->m_sw->pUDSN(pSym->Name, csEntry.undFullName, STACKWALK_MAX_NAMELEN, UNDNAME_COMPLETE);
+				this->m_sw->pUDSN(
+					pSym->Name, csEntry.undName, STACKWALK_MAX_NAMELEN, UNDNAME_NAME_ONLY
+				);
+				this->m_sw->pUDSN(
+					pSym->Name, csEntry.undFullName, STACKWALK_MAX_NAMELEN, UNDNAME_COMPLETE
+				);
 			} else {
 				GetLastError();
 			}
@@ -937,10 +947,10 @@ BOOL StackWalker::ShowCallstack(
 		CallstackEntryType et = nextEntry;
 		if (frameNum == 0)
 			et = firstEntry;
-		this->OnCallstackEntry(et, csEntry);
+		this->OnCallstackEntry(et, &csEntry);
 		
 		if (s.AddrReturn.Offset == 0) {
-			this->OnCallstackEntry(lastEntry, csEntry);
+			this->OnCallstackEntry(lastEntry, &csEntry);
 			SetLastError(ERROR_SUCCESS);
 			break;
 		}
@@ -970,15 +980,26 @@ BOOL __stdcall StackWalker::myReadProcMem(
 		SIZE_T st;
 		BOOL bRet = ReadProcessMemory(hProcess, (LPVOID) qwBaseAddress, lpBuffer, nSize, &st);
 		*lpNumberOfBytesRead = (DWORD) st;
-		//printf("ReadMemory: hProcess: %p, baseAddr: %p, buffer: %p, size: %d, read: %d, result: %d\n", hProcess, (LPVOID) qwBaseAddress, lpBuffer, nSize, (DWORD) st, (DWORD) bRet);
+		// printf(
+		// 	"ReadMemory: hProcess: %p, baseAddr: %p, buffer: %p, size: %d, read: %d, result: %d\n",
+		// 	hProcess, (LPVOID) qwBaseAddress, lpBuffer, nSize, (DWORD) st, (DWORD) bRet
+		// );
 		return bRet;
 	} else {
 		return s_readMemoryFunction(hProcess, qwBaseAddress, lpBuffer, nSize, lpNumberOfBytesRead, s_readMemoryFunction_UserData);
 	}
 }
 
-void StackWalker::OnLoadModule(LPCSTR img, LPCSTR mod, DWORD64 baseAddr, DWORD size, DWORD result, LPCSTR symType, LPCSTR pdbName, ULONGLONG fileVersion)
-{
+void StackWalker::OnLoadModule(
+	LPCSTR img,
+	LPCSTR mod,
+	DWORD64 baseAddr,
+	DWORD size,
+	DWORD result,
+	LPCSTR symType,
+	LPCSTR pdbName,
+	ULONGLONG fileVersion
+) {
 	CHAR buffer[STACKWALK_MAX_NAMELEN];
 	if (fileVersion == 0) {
 		_snprintf_s(
@@ -1001,81 +1022,65 @@ void StackWalker::OnLoadModule(LPCSTR img, LPCSTR mod, DWORD64 baseAddr, DWORD s
 	}
 }
 
-void StackWalker::OnCallstackEntry(CallstackEntryType eType, CallstackEntry &entry) {
+
+void StackWalker::OnCallstackEntry(CallstackEntryType eType, CallstackEntry *entry) {
+	
 	CHAR buffer[STACKWALK_MAX_NAMELEN];
-	if ((eType != lastEntry) && (entry.offset != 0)) {
-		if (entry.name[0] == 0) {
-			strcpy_s(entry.name, "(function-name not available)");
+	
+	if ((eType != lastEntry) && (entry->offset != 0)) {
+		
+		if (entry->undFullName[0] != 0) {
+			strcpy_s(entry->name, entry->undFullName);
+		} else if (entry->undName[0] != 0) {
+			strcpy_s(entry->name, entry->undName);
 		}
-		if (entry.undName[0] != 0) {
-			strcpy_s(entry.name, entry.undName);
+		
+		if (
+			entry->name[0] == 0 &&
+			entry->lineFileName[0] == 0 &&
+			entry->moduleName[0] == 0
+		) {
+			return;
 		}
-		if (entry.undFullName[0] != 0) {
-			strcpy_s(entry.name, entry.undFullName);
+		
+		if (entry->name[0] == 0) {
+			strcpy_s(entry->name, "(#unknown_function)");
 		}
-		if (entry.lineFileName[0] == 0) {
-			strcpy_s(entry.lineFileName, "(filename not available)");
-			if (entry.moduleName[0] == 0) {
-				strcpy_s(entry.moduleName, "(module-name not available)");
+		
+		if (entry->lineFileName[0] == 0) {
+			strcpy_s(entry->lineFileName, "(#unknown_file)");
+			if (entry->moduleName[0] == 0) {
+				strcpy_s(entry->moduleName, "#unknown_moudle");
 			}
 			_snprintf_s(
 				buffer, STACKWALK_MAX_NAMELEN, "%p (%s): %s: %s\n",
-				(LPVOID) entry.offset, entry.moduleName,
-				entry.lineFileName, entry.name
+				(LPVOID) entry->offset, entry->moduleName,
+				entry->lineFileName, entry->name
 			);
 		} else {
 			_snprintf_s(
 				buffer,
 				STACKWALK_MAX_NAMELEN,
 				"%s (%d): %s\n",
-				entry.lineFileName, entry.lineNumber, entry.name
+				entry->lineFileName, entry->lineNumber, entry->name
 			);
 		}
 		OnOutput(buffer);
 	}
+	
 }
 
-void StackWalker::OnSymInit(LPCSTR szSearchPath, DWORD symOptions, LPCSTR szUserName) {
-	CHAR buffer[STACKWALK_MAX_NAMELEN];
-	_snprintf_s(
-		buffer,
-		STACKWALK_MAX_NAMELEN,
-		"SymInit: Symbol-SearchPath: '%s', symOptions: %d, UserName: '%s'\n",
-		szSearchPath, symOptions, szUserName
-	);
-	OnOutput(buffer);
-	// Also display the OS-version
-#if _MSC_VER <= 1200
-	OSVERSIONINFOA ver;
-	ZeroMemory(&ver, sizeof(OSVERSIONINFOA));
-	ver.dwOSVersionInfoSize = sizeof(ver);
-	if (GetVersionExA(&ver) != FALSE) {
-		_snprintf_s(buffer, STACKWALK_MAX_NAMELEN, "OS-Version: %d.%d.%d (%s)\n",
-			ver.dwMajorVersion, ver.dwMinorVersion, ver.dwBuildNumber,
-			ver.szCSDVersion);
-		OnOutput(buffer);
-	}
-#else
-	OSVERSIONINFOEXA ver;
-	ZeroMemory(&ver, sizeof(OSVERSIONINFOEXA));
-	ver.dwOSVersionInfoSize = sizeof(ver);
-	if (GetVersionExA(reinterpret_cast<OSVERSIONINFOA*>(&ver)) != FALSE) {
-		_snprintf_s(
-			buffer, STACKWALK_MAX_NAMELEN, "OS-Version: %d.%d.%d (%s) 0x%x-0x%x\n",
-			ver.dwMajorVersion, ver.dwMinorVersion, ver.dwBuildNumber,
-			ver.szCSDVersion, ver.wSuiteMask, ver.wProductType
-		);
-		OnOutput(buffer);
-	}
-#endif
-}
 
 void StackWalker::OnOutput(LPCSTR buffer) {
+	
 	if(m_fDescriptor > 0) {
-		unsigned int n = (unsigned int)strlen(buffer);
-		if (_write(m_fDescriptor, buffer, n) != n) {
+		size_t n = strlen(buffer);
+		int written = _write(m_fDescriptor, buffer, n);
+		if (static_cast<size_t>(written) != n) {
 			fprintf(stderr, "SegfaultHandler: Error writing to file\n");
 		}
 	}
+	
 	fprintf(stderr, buffer);
+	
 }

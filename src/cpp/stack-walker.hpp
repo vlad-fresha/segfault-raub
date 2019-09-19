@@ -19,11 +19,9 @@
 
 class StackWalkerInternal;  // forward
 
-class StackWalker
-{
+class StackWalker {
 public:
-	typedef enum StackWalkOptions
-	{
+	typedef enum StackWalkOptions {
 		// No addition info will be retrived
 		// (only the address is available)
 		RetrieveNone = 0,
@@ -81,7 +79,8 @@ public:
 		HANDLE hThread = GetCurrentThread(),
 		const CONTEXT *context = NULL,
 		PReadProcessMemoryRoutine readMemoryFunction = NULL,
-		LPVOID pUserData = NULL // optional to identify some data in the 'readMemoryFunction'-callback
+		// optional to identify some data in the 'readMemoryFunction'-callback
+		LPVOID pUserData = NULL
 	);
 	
 protected:
@@ -110,9 +109,17 @@ protected:
 		lastEntry
 	};
 	
-	virtual void OnSymInit(LPCSTR szSearchPath, DWORD symOptions, LPCSTR szUserName);
-	virtual void OnLoadModule(LPCSTR img, LPCSTR mod, DWORD64 baseAddr, DWORD size, DWORD result, LPCSTR symType, LPCSTR pdbName, ULONGLONG fileVersion);
-	virtual void OnCallstackEntry(CallstackEntryType eType, CallstackEntry &entry);
+	virtual void OnLoadModule(
+		LPCSTR img,
+		LPCSTR mod,
+		DWORD64 baseAddr,
+		DWORD size,
+		DWORD result,
+		LPCSTR symType,
+		LPCSTR pdbName,
+		ULONGLONG fileVersion
+	);
+	virtual void OnCallstackEntry(CallstackEntryType eType, CallstackEntry *entry);
 	virtual void OnOutput(LPCSTR szText);
 	
 	StackWalkerInternal *m_sw;
@@ -125,7 +132,13 @@ protected:
 	
 	int m_fDescriptor;
 	
-	static BOOL __stdcall myReadProcMem(HANDLE hProcess, DWORD64 qwBaseAddress, PVOID lpBuffer, DWORD nSize, LPDWORD lpNumberOfBytesRead);
+	static BOOL __stdcall myReadProcMem(
+		HANDLE hProcess,
+		DWORD64 qwBaseAddress,
+		PVOID lpBuffer,
+		DWORD nSize,
+		LPDWORD lpNumberOfBytesRead
+	);
 	
 	friend StackWalkerInternal;
 };
@@ -152,7 +165,13 @@ protected:
 		EXCEPTION_POINTERS *pExp = NULL; \
 		__try { \
 			throw 0; \
-		} __except( ( (pExp = GetExceptionInformation()) ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_EXECUTE_HANDLER)) {} \
+		} __except( \
+			( \
+				(pExp = GetExceptionInformation()) \
+					? EXCEPTION_EXECUTE_HANDLER \
+					: EXCEPTION_EXECUTE_HANDLER \
+			) \
+		) {} \
 		if (pExp != NULL) \
 			memcpy(&c, pExp->ContextRecord, sizeof(CONTEXT)); \
 			c.ContextFlags = contextFlags; \
