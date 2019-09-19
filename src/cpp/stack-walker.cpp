@@ -1,9 +1,10 @@
 #include <tchar.h>
 #include <io.h>
+
 #pragma comment(lib, "version.lib")  // for "VerQueryValue"
 
 #include "stack-walker.hpp"
-
+// NOTE: include after header
 #include <dbghelp.h>
 
 
@@ -725,6 +726,82 @@ BOOL StackWalker::LoadModules() {
 static StackWalker::PReadProcessMemoryRoutine s_readMemoryFunction = NULL;
 static LPVOID s_readMemoryFunction_UserData = NULL;
 
+
+inline bool getValidContext(const CONTEXT *src, HANDLE hThread, CONTEXT *dest) {
+	if (src == NULL) {
+		// If no src is provided, capture the context
+		if (hThread == GetCurrentThread()) {
+			memset(dest, 0, sizeof(CONTEXT));
+			dest->ContextFlags = USED_CONTEXT_FLAGS;
+			RtlCaptureContext(dest);
+		} else {
+			SuspendThread(hThread);
+			memset(dest, 0, sizeof(CONTEXT));
+			dest->ContextFlags = USED_CONTEXT_FLAGS;
+			if (GetThreadContext(hThread, dest) == FALSE) {
+				ResumeThread(hThread);
+				return false;
+			}
+		}
+	} else {
+		*dest = *src;
+	}
+	return true;
+}
+
+
+inline void setSymType(SYM_TYPE SymType, CallstackEntry *csEntry) {
+	switch (SymType) {
+	case SymNone:
+		csEntry->symTypeString = "-nosymbols-";
+		break;
+	case SymCoff:
+		csEntry->symTypeString = "COFF";
+		break;
+	case SymCv:
+		csEntry->symTypeString = "CV";
+		break;
+	case SymPdb:
+		csEntry->symTypeString = "PDB";
+		break;
+	case SymExport:
+		csEntry->symTypeString = "-exported-";
+		break;
+	case SymDeferred:
+		csEntry->symTypeString = "-deferred-";
+		break;
+	case SymSym:
+		csEntry->symTypeString = "SYM";
+		break;
+#if API_VERSION_NUMBER >= 9
+	case SymDia:
+		csEntry->symTypeString = "DIA";
+		break;
+#endif
+	case 8: //SymVirtual:
+		csEntry->symTypeString = "Virtual";
+		break;
+	default:
+		//_snprintf(ty, sizeof ty, "symtype=%ld", (long) Module.SymType);
+		csEntry->symTypeString = NULL;
+		break;
+	}
+}
+
+
+inline void initEntityStrings(CallstackEntry *csEntry) {
+	csEntry->name[0] = 0;
+	csEntry->undName[0] = 0;
+	csEntry->undFullName[0] = 0;
+	csEntry->offsetFromSmybol = 0;
+	csEntry->offsetFromLine = 0;
+	csEntry->lineFileName[0] = 0;
+	csEntry->lineNumber = 0;
+	csEntry->loadedImageName[0] = 0;
+	csEntry->moduleName[0] = 0;
+}
+
+
 BOOL StackWalker::ShowCallstack(
 	HANDLE hThread,
 	const CONTEXT *context,
@@ -750,37 +827,15 @@ BOOL StackWalker::ShowCallstack(
 	s_readMemoryFunction = readMemoryFunction;
 	s_readMemoryFunction_UserData = pUserData;
 	
-	if (context == NULL) {
-		// If no context is provided, capture the context
-		if (hThread == GetCurrentThread()) {
-			GET_CURRENT_CONTEXT(c, USED_CONTEXT_FLAGS);
-		} else {
-			SuspendThread(hThread);
-			memset(&c, 0, sizeof(CONTEXT));
-			c.ContextFlags = USED_CONTEXT_FLAGS;
-			if (GetThreadContext(hThread, &c) == FALSE) {
-				ResumeThread(hThread);
-				return FALSE;
-			}
-		}
-	} else {
-		c = *context;
+	if (!getValidContext(context, hThread, &c)) {
+		return FALSE;
 	}
 	
 	// init STACKFRAME for first call
 	STACKFRAME64 s; // in/out stackframe
 	memset(&s, 0, sizeof(s));
 	DWORD imageType;
-#ifdef _M_IX86
-	// normally, call ImageNtHeader() and use machine info from PE header
-	imageType = IMAGE_FILE_MACHINE_I386;
-	s.AddrPC.Offset = c.Eip;
-	s.AddrPC.Mode = AddrModeFlat;
-	s.AddrFrame.Offset = c.Ebp;
-	s.AddrFrame.Mode = AddrModeFlat;
-	s.AddrStack.Offset = c.Esp;
-	s.AddrStack.Mode = AddrModeFlat;
-#elif _M_X64
+#ifdef _M_X64
 	imageType = IMAGE_FILE_MACHINE_AMD64;
 	s.AddrPC.Offset = c.Rip;
 	s.AddrPC.Mode = AddrModeFlat;
@@ -840,15 +895,7 @@ BOOL StackWalker::ShowCallstack(
 		}
 		
 		csEntry.offset = s.AddrPC.Offset;
-		csEntry.name[0] = 0;
-		csEntry.undName[0] = 0;
-		csEntry.undFullName[0] = 0;
-		csEntry.offsetFromSmybol = 0;
-		csEntry.offsetFromLine = 0;
-		csEntry.lineFileName[0] = 0;
-		csEntry.lineNumber = 0;
-		csEntry.loadedImageName[0] = 0;
-		csEntry.moduleName[0] = 0;
+		initEntityStrings(&csEntry);
 		if (s.AddrPC.Offset == s.AddrReturn.Offset) {
 			GetLastError();
 			break;
@@ -899,42 +946,7 @@ BOOL StackWalker::ShowCallstack(
 			if (
 				this->m_sw->GetModuleInfo(this->m_hProcess, s.AddrPC.Offset, &Module) != FALSE
 			) { // got module info OK
-				switch (Module.SymType) {
-				case SymNone:
-					csEntry.symTypeString = "-nosymbols-";
-					break;
-				case SymCoff:
-					csEntry.symTypeString = "COFF";
-					break;
-				case SymCv:
-					csEntry.symTypeString = "CV";
-					break;
-				case SymPdb:
-					csEntry.symTypeString = "PDB";
-					break;
-				case SymExport:
-					csEntry.symTypeString = "-exported-";
-					break;
-				case SymDeferred:
-					csEntry.symTypeString = "-deferred-";
-					break;
-				case SymSym:
-					csEntry.symTypeString = "SYM";
-					break;
-#if API_VERSION_NUMBER >= 9
-				case SymDia:
-					csEntry.symTypeString = "DIA";
-					break;
-#endif
-				case 8: //SymVirtual:
-					csEntry.symTypeString = "Virtual";
-					break;
-				default:
-					//_snprintf(ty, sizeof ty, "symtype=%ld", (long) Module.SymType);
-					csEntry.symTypeString = NULL;
-					break;
-				}
-				
+				setSymType(Module.SymType, &csEntry);
 				// TODO: Mache dies sicher...!
 				strcpy_s(csEntry.moduleName, Module.ModuleName);
 				csEntry.baseOfImage = Module.BaseOfImage;
@@ -945,8 +957,9 @@ BOOL StackWalker::ShowCallstack(
 		} // we seem to have a valid PC
 		
 		CallstackEntryType et = nextEntry;
-		if (frameNum == 0)
+		if (frameNum == 0) {
 			et = firstEntry;
+		}
 		this->OnCallstackEntry(et, &csEntry);
 		
 		if (s.AddrReturn.Offset == 0) {
@@ -986,7 +999,14 @@ BOOL __stdcall StackWalker::myReadProcMem(
 		// );
 		return bRet;
 	} else {
-		return s_readMemoryFunction(hProcess, qwBaseAddress, lpBuffer, nSize, lpNumberOfBytesRead, s_readMemoryFunction_UserData);
+		return s_readMemoryFunction(
+			hProcess,
+			qwBaseAddress,
+			lpBuffer,
+			nSize,
+			lpNumberOfBytesRead,
+			s_readMemoryFunction_UserData
+		);
 	}
 }
 
