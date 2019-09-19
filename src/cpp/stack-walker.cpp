@@ -275,7 +275,7 @@ private:
 		BOOL keepGoing;
 		size_t i;
 		
-		for (i = 0; i<(sizeof(dllname) / sizeof(dllname[0])); i++) {
+		for (i = 0; i < (sizeof(dllname) / sizeof(dllname[0])); i++) {
 			hToolhelp = LoadLibrary(dllname[i]);
 			if (hToolhelp == NULL)
 				continue;
@@ -320,21 +320,21 @@ private:
 	
 	BOOL GetModuleListPSAPI(HANDLE hProcess) {
 		// EnumProcessModules()
-		typedef BOOL (__stdcall *tEPM)(
-			HANDLE hProcess, HMODULE *lphModule, DWORD cb, LPDWORD lpcbNeeded
-		);
+		typedef BOOL (
+			__stdcall *tEPM
+		)(HANDLE hProcess, HMODULE *lphModule, DWORD cb, LPDWORD lpcbNeeded);
 		// GetModuleFileNameEx()
-		typedef DWORD (__stdcall *tGMFNE)(
-			HANDLE hProcess, HMODULE hModule, LPSTR lpFilename, DWORD nSize
-		);
+		typedef DWORD (
+			__stdcall *tGMFNE
+		)(HANDLE hProcess, HMODULE hModule, LPSTR lpFilename, DWORD nSize);
 		// GetModuleBaseName()
-		typedef DWORD (__stdcall *tGMBN)(
-			HANDLE hProcess, HMODULE hModule, LPSTR lpFilename, DWORD nSize
-		);
+		typedef DWORD (
+			__stdcall *tGMBN
+		)(HANDLE hProcess, HMODULE hModule, LPSTR lpFilename, DWORD nSize);
 		// GetModuleInformation()
-		typedef BOOL (__stdcall *tGMI)(
-			HANDLE hProcess, HMODULE hModule, LPMODULEINFO pmi, DWORD nSize
-		);
+		typedef BOOL (
+			__stdcall *tGMI
+		)(HANDLE hProcess, HMODULE hModule, LPMODULEINFO pmi, DWORD nSize);
 	
 		HINSTANCE hPsapi;
 		tEPM pEPM;
@@ -367,9 +367,15 @@ private:
 			return FALSE;
 		}
 		
-		hMods = (HMODULE*) malloc(sizeof(HMODULE) * (TTBUFLEN / sizeof HMODULE));
-		tt = (char*) malloc(sizeof(char) * TTBUFLEN);
-		tt2 = (char*) malloc(sizeof(char) * TTBUFLEN);
+		hMods = reinterpret_cast<HMODULE*>(
+			malloc(sizeof(HMODULE) * (TTBUFLEN / sizeof HMODULE))
+		);
+		tt = reinterpret_cast<char*>(
+			malloc(sizeof(char) * TTBUFLEN)
+		);
+		tt2 = reinterpret_cast<char*>(
+			malloc(sizeof(char) * TTBUFLEN)
+		);
 		if ((hMods == NULL) || (tt == NULL) || (tt2 == NULL)) {
 			goto cleanup;
 		}
@@ -444,7 +450,7 @@ private:
 								VerQueryValue(
 									vData,
 									szSubBlock,
-									(LPVOID*) &fInfo,
+									reinterpret_cast<LPVOID*>(&fInfo),
 									&len
 								) == 0
 							) {
@@ -542,7 +548,11 @@ public:
 			return FALSE;
 		}
 		memcpy(pData, pModuleInfo, sizeof(IMAGEHLP_MODULE64_V2));
-		if (this->pSGMI(hProcess, baseAddr, (IMAGEHLP_MODULE64_V2*) pData) != FALSE) {
+		if (
+			this->pSGMI(
+				hProcess, baseAddr, reinterpret_cast<IMAGEHLP_MODULE64_V2*>(pData)
+			) != FALSE
+		) {
 			// only copy as much memory as is reserved...
 			memcpy(pModuleInfo, pData, sizeof(IMAGEHLP_MODULE64_V2));
 			pModuleInfo->SizeOfStruct = sizeof(IMAGEHLP_MODULE64_V2);
@@ -609,7 +619,7 @@ BOOL StackWalker::LoadModules() {
 	char *szSymPath = NULL;
 	if ((this->m_options & SymBuildPath) != 0) {
 		const size_t nSymPathLen = 4096;
-		szSymPath = (char*) malloc(nSymPathLen);
+		szSymPath = reinterpret_cast<char*>(malloc(nSymPathLen));
 		if (szSymPath == NULL) {
 			SetLastError(ERROR_NOT_ENOUGH_MEMORY);
 			return FALSE;
@@ -623,18 +633,18 @@ BOOL StackWalker::LoadModules() {
 
 		strcat_s(szSymPath, nSymPathLen, ".;");
 
-		const size_t nTempLen = 1024;
-		char szTemp[nTempLen];
+		const size_t kTempLen = 1024;
+		char szTemp[kTempLen];
 		// Now add the current directory:
-		if (GetCurrentDirectoryA(nTempLen, szTemp) > 0) {
-			szTemp[nTempLen-1] = 0;
+		if (GetCurrentDirectoryA(kTempLen, szTemp) > 0) {
+			szTemp[kTempLen-1] = 0;
 			strcat_s(szSymPath, nSymPathLen, szTemp);
 			strcat_s(szSymPath, nSymPathLen, ";");
 		}
 
 		// Now add the path for the main-module:
-		if (GetModuleFileNameA(NULL, szTemp, nTempLen) > 0) {
-			szTemp[nTempLen-1] = 0;
+		if (GetModuleFileNameA(NULL, szTemp, kTempLen) > 0) {
+			szTemp[kTempLen-1] = 0;
 			for (char *p = (szTemp+strlen(szTemp)-1); p >= szTemp; --p) {
 				// locate the rightmost path separator
 				if ((*p == '\\') || (*p == '/') || (*p == ':')) {
@@ -647,35 +657,40 @@ BOOL StackWalker::LoadModules() {
 				strcat_s(szSymPath, nSymPathLen, ";");
 			}
 		}
-		if (GetEnvironmentVariableA("_NT_SYMBOL_PATH", szTemp, nTempLen) > 0) {
-			szTemp[nTempLen-1] = 0;
+		if (GetEnvironmentVariableA("_NT_SYMBOL_PATH", szTemp, kTempLen) > 0) {
+			szTemp[kTempLen-1] = 0;
 			strcat_s(szSymPath, nSymPathLen, szTemp);
 			strcat_s(szSymPath, nSymPathLen, ";");
 		}
-		if (GetEnvironmentVariableA("_NT_ALTERNATE_SYMBOL_PATH", szTemp, nTempLen) > 0) {
-			szTemp[nTempLen-1] = 0;
+		if (GetEnvironmentVariableA("_NT_ALTERNATE_SYMBOL_PATH", szTemp, kTempLen) > 0) {
+			szTemp[kTempLen-1] = 0;
 			strcat_s(szSymPath, nSymPathLen, szTemp);
 			strcat_s(szSymPath, nSymPathLen, ";");
 		}
-		if (GetEnvironmentVariableA("SYSTEMROOT", szTemp, nTempLen) > 0) {
-			szTemp[nTempLen-1] = 0;
+		if (GetEnvironmentVariableA("SYSTEMROOT", szTemp, kTempLen) > 0) {
+			szTemp[kTempLen-1] = 0;
 			strcat_s(szSymPath, nSymPathLen, szTemp);
 			strcat_s(szSymPath, nSymPathLen, ";");
 			// also add the "system32"-directory:
-			strcat_s(szTemp, nTempLen, "\\system32");
+			strcat_s(szTemp, kTempLen, "\\system32");
 			strcat_s(szSymPath, nSymPathLen, szTemp);
 			strcat_s(szSymPath, nSymPathLen, ";");
 		}
 		
 		if ((this->m_options & SymBuildPath) != 0) {
-			if (GetEnvironmentVariableA("SYSTEMDRIVE", szTemp, nTempLen) > 0) {
-				szTemp[nTempLen-1] = 0;
+			if (GetEnvironmentVariableA("SYSTEMDRIVE", szTemp, kTempLen) > 0) {
+				szTemp[kTempLen-1] = 0;
 				strcat_s(szSymPath, nSymPathLen, "SRV*");
 				strcat_s(szSymPath, nSymPathLen, szTemp);
 				strcat_s(szSymPath, nSymPathLen, "\\websymbols");
 				strcat_s(szSymPath, nSymPathLen, "*http://msdl.microsoft.com/download/symbols;");
-			} else
-				strcat_s(szSymPath, nSymPathLen, "SRV*c:\\websymbols*http://msdl.microsoft.com/download/symbols;");
+			} else {
+				strcat_s(
+					szSymPath,
+					nSymPathLen,
+					"SRV*c:\\websymbols*http://msdl.microsoft.com/download/symbols;"
+				);
+			}
 		}
 	}
 	
@@ -781,7 +796,9 @@ BOOL StackWalker::ShowCallstack(
 #error "Platform not supported!"
 #endif
 	
-	pSym = (IMAGEHLP_SYMBOL64 *) malloc(sizeof(IMAGEHLP_SYMBOL64) + STACKWALK_MAX_NAMELEN);
+	pSym = reinterpret_cast<IMAGEHLP_SYMBOL64*>(
+		malloc(sizeof(IMAGEHLP_SYMBOL64) + STACKWALK_MAX_NAMELEN)
+	);
 	if (!pSym) goto cleanup;  // not enough memory...
 	memset(pSym, 0, sizeof(IMAGEHLP_SYMBOL64) + STACKWALK_MAX_NAMELEN);
 	pSym->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
@@ -975,7 +992,12 @@ void StackWalker::OnLoadModule(LPCSTR img, LPCSTR mod, DWORD64 baseAddr, DWORD s
 		DWORD v3 = (DWORD) (fileVersion>>16) & 0xFFFF;
 		DWORD v2 = (DWORD) (fileVersion>>32) & 0xFFFF;
 		DWORD v1 = (DWORD) (fileVersion>>48) & 0xFFFF;
-		_snprintf_s(buffer, STACKWALK_MAX_NAMELEN, "%s:%s (%p), size: %d (result: %d), SymType: '%s', PDB: '%s', fileVersion: %d.%d.%d.%d\n", img, mod, (LPVOID) baseAddr, size, result, symType, pdbName, v1, v2, v3, v4);
+		_snprintf_s(
+			buffer,
+			STACKWALK_MAX_NAMELEN,
+			"%s:%s (%p), size: %d (result: %d), SymType: '%s', PDB: '%s', fileVersion: %d.%d.%d.%d\n",
+			img, mod, (LPVOID) baseAddr, size, result, symType, pdbName, v1, v2, v3, v4
+		);
 	}
 }
 
@@ -993,9 +1015,14 @@ void StackWalker::OnCallstackEntry(CallstackEntryType eType, CallstackEntry &ent
 		}
 		if (entry.lineFileName[0] == 0) {
 			strcpy_s(entry.lineFileName, "(filename not available)");
-			if (entry.moduleName[0] == 0)
+			if (entry.moduleName[0] == 0) {
 				strcpy_s(entry.moduleName, "(module-name not available)");
-			_snprintf_s(buffer, STACKWALK_MAX_NAMELEN, "%p (%s): %s: %s\n", (LPVOID) entry.offset, entry.moduleName, entry.lineFileName, entry.name);
+			}
+			_snprintf_s(
+				buffer, STACKWALK_MAX_NAMELEN, "%p (%s): %s: %s\n",
+				(LPVOID) entry.offset, entry.moduleName,
+				entry.lineFileName, entry.name
+			);
 		} else {
 			_snprintf_s(
 				buffer,
@@ -1010,7 +1037,12 @@ void StackWalker::OnCallstackEntry(CallstackEntryType eType, CallstackEntry &ent
 
 void StackWalker::OnSymInit(LPCSTR szSearchPath, DWORD symOptions, LPCSTR szUserName) {
 	CHAR buffer[STACKWALK_MAX_NAMELEN];
-	_snprintf_s(buffer, STACKWALK_MAX_NAMELEN, "SymInit: Symbol-SearchPath: '%s', symOptions: %d, UserName: '%s'\n", szSearchPath, symOptions, szUserName);
+	_snprintf_s(
+		buffer,
+		STACKWALK_MAX_NAMELEN,
+		"SymInit: Symbol-SearchPath: '%s', symOptions: %d, UserName: '%s'\n",
+		szSearchPath, symOptions, szUserName
+	);
 	OnOutput(buffer);
 	// Also display the OS-version
 #if _MSC_VER <= 1200
@@ -1027,10 +1059,12 @@ void StackWalker::OnSymInit(LPCSTR szSearchPath, DWORD symOptions, LPCSTR szUser
 	OSVERSIONINFOEXA ver;
 	ZeroMemory(&ver, sizeof(OSVERSIONINFOEXA));
 	ver.dwOSVersionInfoSize = sizeof(ver);
-	if (GetVersionExA((OSVERSIONINFOA*) &ver) != FALSE) {
-		_snprintf_s(buffer, STACKWALK_MAX_NAMELEN, "OS-Version: %d.%d.%d (%s) 0x%x-0x%x\n",
+	if (GetVersionExA(reinterpret_cast<OSVERSIONINFOA*>(&ver)) != FALSE) {
+		_snprintf_s(
+			buffer, STACKWALK_MAX_NAMELEN, "OS-Version: %d.%d.%d (%s) 0x%x-0x%x\n",
 			ver.dwMajorVersion, ver.dwMinorVersion, ver.dwBuildNumber,
-			ver.szCSDVersion, ver.wSuiteMask, ver.wProductType);
+			ver.szCSDVersion, ver.wSuiteMask, ver.wProductType
+		);
 		OnOutput(buffer);
 	}
 #endif

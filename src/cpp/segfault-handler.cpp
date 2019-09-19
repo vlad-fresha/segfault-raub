@@ -76,12 +76,13 @@ SEGFAULT_HANDLER {
 	#endif
 	
 	// Write the header line
+	uint64_t outAddr = static_cast<uint64_t>(address);
 	n = SNPRINTF(
 		sbuff,
 		BUFF_SIZE,
-		"PID %d received SIGSEGV for address: 0x%lld\n",
+		"PID %d received SIGSEGV for address: 0x%llu\n",
 		pid,
-		static_cast<uint64_t>(address)
+		outAddr
 	);
 	
 	if(fd > 0) {
