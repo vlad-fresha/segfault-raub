@@ -117,6 +117,7 @@ protected:
 		CONTEXT &c,
 		void *_pSym
 	);
+	inline void buildSymPath(char *szSymPath);
 	
 	StackWalkerInternal *m_sw;
 	HANDLE m_hProcess;

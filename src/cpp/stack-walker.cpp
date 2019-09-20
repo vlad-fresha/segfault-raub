@@ -51,6 +51,87 @@ StackWalker::~StackWalker() {
 	this->m_sw = NULL;
 }
 
+
+const size_t nSymPathLen = 4096;
+
+inline void StackWalker::buildSymPath(char *szSymPath) {
+	
+	szSymPath[0] = 0;
+	
+	// Now first add the (optional) provided sympath:
+	if (this->m_szSymPath != NULL) {
+		strcat_s(szSymPath, nSymPathLen, this->m_szSymPath);
+		strcat_s(szSymPath, nSymPathLen, ";");
+	}
+	
+	strcat_s(szSymPath, nSymPathLen, ".;");
+	
+	const size_t kTempLen = 1024;
+	char szTemp[kTempLen];
+	// Now add the current directory:
+	if (GetCurrentDirectoryA(kTempLen, szTemp) > 0) {
+		szTemp[kTempLen-1] = 0;
+		strcat_s(szSymPath, nSymPathLen, szTemp);
+		strcat_s(szSymPath, nSymPathLen, ";");
+	}
+	
+	// Now add the path for the main-module:
+	if (GetModuleFileNameA(NULL, szTemp, kTempLen) > 0) {
+		szTemp[kTempLen-1] = 0;
+		for (char *p = (szTemp+strlen(szTemp)-1); p >= szTemp; --p) {
+			// locate the rightmost path separator
+			if ((*p == '\\') || (*p == '/') || (*p == ':')) {
+				*p = 0;
+				break;
+			}
+		}  // for (search for path separator...)
+		if (strlen(szTemp) > 0) {
+			strcat_s(szSymPath, nSymPathLen, szTemp);
+			strcat_s(szSymPath, nSymPathLen, ";");
+		}
+	}
+	
+	if (GetEnvironmentVariableA("_NT_SYMBOL_PATH", szTemp, kTempLen) > 0) {
+		szTemp[kTempLen-1] = 0;
+		strcat_s(szSymPath, nSymPathLen, szTemp);
+		strcat_s(szSymPath, nSymPathLen, ";");
+	}
+	
+	if (GetEnvironmentVariableA("_NT_ALTERNATE_SYMBOL_PATH", szTemp, kTempLen) > 0) {
+		szTemp[kTempLen-1] = 0;
+		strcat_s(szSymPath, nSymPathLen, szTemp);
+		strcat_s(szSymPath, nSymPathLen, ";");
+	}
+	
+	if (GetEnvironmentVariableA("SYSTEMROOT", szTemp, kTempLen) > 0) {
+		szTemp[kTempLen-1] = 0;
+		strcat_s(szSymPath, nSymPathLen, szTemp);
+		strcat_s(szSymPath, nSymPathLen, ";");
+		// also add the "system32"-directory:
+		strcat_s(szTemp, kTempLen, "\\system32");
+		strcat_s(szSymPath, nSymPathLen, szTemp);
+		strcat_s(szSymPath, nSymPathLen, ";");
+	}
+	
+	if ((this->m_options & SymBuildPath) != 0) {
+		if (GetEnvironmentVariableA("SYSTEMDRIVE", szTemp, kTempLen) > 0) {
+			szTemp[kTempLen-1] = 0;
+			strcat_s(szSymPath, nSymPathLen, "SRV*");
+			strcat_s(szSymPath, nSymPathLen, szTemp);
+			strcat_s(szSymPath, nSymPathLen, "\\websymbols");
+			strcat_s(szSymPath, nSymPathLen, "*http://msdl.microsoft.com/download/symbols;");
+		} else {
+			strcat_s(
+				szSymPath,
+				nSymPathLen,
+				"SRV*c:\\websymbols*http://msdl.microsoft.com/download/symbols;"
+			);
+		}
+	}
+	
+}
+
+
 BOOL StackWalker::LoadModules() {
 	if (this->m_sw == NULL) {
 		SetLastError(ERROR_DLL_INIT_FAILED);
@@ -63,80 +144,12 @@ BOOL StackWalker::LoadModules() {
 	// Build the sym-path:
 	char *szSymPath = NULL;
 	if ((this->m_options & SymBuildPath) != 0) {
-		const size_t nSymPathLen = 4096;
 		szSymPath = reinterpret_cast<char*>(malloc(nSymPathLen));
 		if (szSymPath == NULL) {
 			SetLastError(ERROR_NOT_ENOUGH_MEMORY);
 			return FALSE;
 		}
-		szSymPath[0] = 0;
-		// Now first add the (optional) provided sympath:
-		if (this->m_szSymPath != NULL) {
-			strcat_s(szSymPath, nSymPathLen, this->m_szSymPath);
-			strcat_s(szSymPath, nSymPathLen, ";");
-		}
-
-		strcat_s(szSymPath, nSymPathLen, ".;");
-
-		const size_t kTempLen = 1024;
-		char szTemp[kTempLen];
-		// Now add the current directory:
-		if (GetCurrentDirectoryA(kTempLen, szTemp) > 0) {
-			szTemp[kTempLen-1] = 0;
-			strcat_s(szSymPath, nSymPathLen, szTemp);
-			strcat_s(szSymPath, nSymPathLen, ";");
-		}
-
-		// Now add the path for the main-module:
-		if (GetModuleFileNameA(NULL, szTemp, kTempLen) > 0) {
-			szTemp[kTempLen-1] = 0;
-			for (char *p = (szTemp+strlen(szTemp)-1); p >= szTemp; --p) {
-				// locate the rightmost path separator
-				if ((*p == '\\') || (*p == '/') || (*p == ':')) {
-					*p = 0;
-					break;
-				}
-			}  // for (search for path separator...)
-			if (strlen(szTemp) > 0) {
-				strcat_s(szSymPath, nSymPathLen, szTemp);
-				strcat_s(szSymPath, nSymPathLen, ";");
-			}
-		}
-		if (GetEnvironmentVariableA("_NT_SYMBOL_PATH", szTemp, kTempLen) > 0) {
-			szTemp[kTempLen-1] = 0;
-			strcat_s(szSymPath, nSymPathLen, szTemp);
-			strcat_s(szSymPath, nSymPathLen, ";");
-		}
-		if (GetEnvironmentVariableA("_NT_ALTERNATE_SYMBOL_PATH", szTemp, kTempLen) > 0) {
-			szTemp[kTempLen-1] = 0;
-			strcat_s(szSymPath, nSymPathLen, szTemp);
-			strcat_s(szSymPath, nSymPathLen, ";");
-		}
-		if (GetEnvironmentVariableA("SYSTEMROOT", szTemp, kTempLen) > 0) {
-			szTemp[kTempLen-1] = 0;
-			strcat_s(szSymPath, nSymPathLen, szTemp);
-			strcat_s(szSymPath, nSymPathLen, ";");
-			// also add the "system32"-directory:
-			strcat_s(szTemp, kTempLen, "\\system32");
-			strcat_s(szSymPath, nSymPathLen, szTemp);
-			strcat_s(szSymPath, nSymPathLen, ";");
-		}
-		
-		if ((this->m_options & SymBuildPath) != 0) {
-			if (GetEnvironmentVariableA("SYSTEMDRIVE", szTemp, kTempLen) > 0) {
-				szTemp[kTempLen-1] = 0;
-				strcat_s(szSymPath, nSymPathLen, "SRV*");
-				strcat_s(szSymPath, nSymPathLen, szTemp);
-				strcat_s(szSymPath, nSymPathLen, "\\websymbols");
-				strcat_s(szSymPath, nSymPathLen, "*http://msdl.microsoft.com/download/symbols;");
-			} else {
-				strcat_s(
-					szSymPath,
-					nSymPathLen,
-					"SRV*c:\\websymbols*http://msdl.microsoft.com/download/symbols;"
-				);
-			}
-		}
+		buildSymPath(szSymPath);
 	}
 	
 	// First Init the whole stuff...
