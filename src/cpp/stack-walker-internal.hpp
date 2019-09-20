@@ -162,16 +162,16 @@ public:
 	LPSTR m_szSymPath;
 	
 	struct IMAGEHLP_MODULE64_V2 {
-			DWORD    SizeOfStruct;           // set to sizeof(IMAGEHLP_MODULE64)
-			DWORD64  BaseOfImage;            // base load address of module
-			DWORD    ImageSize;              // virtual size of the loaded module
-			DWORD    TimeDateStamp;          // date/time stamp from pe header
-			DWORD    CheckSum;               // checksum from the pe header
-			DWORD    NumSyms;                // number of symbols in the symbol table
-			SYM_TYPE SymType;                // type of symbols loaded
-			CHAR     ModuleName[32];         // module name
-			CHAR     ImageName[256];         // image name
-			CHAR     LoadedImageName[256];   // symbol file name
+		DWORD    SizeOfStruct;           // set to sizeof(IMAGEHLP_MODULE64)
+		DWORD64  BaseOfImage;            // base load address of module
+		DWORD    ImageSize;              // virtual size of the loaded module
+		DWORD    TimeDateStamp;          // date/time stamp from pe header
+		DWORD    CheckSum;               // checksum from the pe header
+		DWORD    NumSyms;                // number of symbols in the symbol table
+		SYM_TYPE SymType;                // type of symbols loaded
+		CHAR     ModuleName[32];         // module name
+		CHAR     ImageName[256];         // image name
+		CHAR     LoadedImageName[256];   // symbol file name
 	};
 	
 	// SymCleanup()
@@ -508,6 +508,39 @@ private:
 	}
 	
 	
+	inline void setSymType(SYM_TYPE SymType, const char **szSymType) {
+		switch(SymType) {
+			case SymNone:
+				*szSymType = "-nosymbols-";
+				break;
+			case SymCoff:
+				*szSymType = "COFF";
+				break;
+			case SymCv:
+				*szSymType = "CV";
+				break;
+			case SymPdb:
+				*szSymType = "PDB";
+				break;
+			case SymExport:
+				*szSymType = "-exported-";
+				break;
+			case SymDeferred:
+				*szSymType = "-deferred-";
+				break;
+			case SymSym:
+				*szSymType = "SYM";
+				break;
+			case 8: //SymVirtual:
+				*szSymType = "Virtual";
+				break;
+			case 9: // SymDia:
+				*szSymType = "DIA";
+				break;
+		}
+	}
+	
+	
 	DWORD LoadModule(
 		HANDLE hProcess,
 		LPCSTR img,
@@ -520,9 +553,8 @@ private:
 		DWORD result = ERROR_SUCCESS;
 		if ((szImg == NULL) || (szMod == NULL)) {
 			result = ERROR_NOT_ENOUGH_MEMORY;
-		} else {
-			if (pSLM(hProcess, 0, szImg, szMod, baseAddr, size) == 0)
-				result = GetLastError();
+		} else if (pSLM(hProcess, 0, szImg, szMod, baseAddr, size) == 0) {
+			result = GetLastError();
 		}
 		
 		if ((m_parent != NULL) && (szImg != NULL)) {
@@ -533,35 +565,7 @@ private:
 			IMAGEHLP_MODULE64_V2 Module;
 			const char *szSymType = "-unknown-";
 			if (this->GetModuleInfo(hProcess, baseAddr, &Module) != FALSE) {
-				switch(Module.SymType) {
-					case SymNone:
-						szSymType = "-nosymbols-";
-						break;
-					case SymCoff:
-						szSymType = "COFF";
-						break;
-					case SymCv:
-						szSymType = "CV";
-						break;
-					case SymPdb:
-						szSymType = "PDB";
-						break;
-					case SymExport:
-						szSymType = "-exported-";
-						break;
-					case SymDeferred:
-						szSymType = "-deferred-";
-						break;
-					case SymSym:
-						szSymType = "SYM";
-						break;
-					case 8: //SymVirtual:
-						szSymType = "Virtual";
-						break;
-					case 9: // SymDia:
-						szSymType = "DIA";
-						break;
-				}
+				setSymType(Module.SymType, &szSymType);
 			}
 			this->m_parent->OnLoadModule(
 				img, mod, baseAddr, size,
