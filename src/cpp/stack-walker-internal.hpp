@@ -1,6 +1,9 @@
 #ifndef _STACK_WALKER_INTERNAL_HPP_
 #define _STACK_WALKER_INTERNAL_HPP_
 
+
+#define TTBUFLEN 8096
+
 class StackWalkerInternal {
 public:
 	StackWalkerInternal(StackWalker *parent, HANDLE hProcess) {
@@ -320,72 +323,115 @@ private:
 		return TRUE;
 	} // GetModuleListTH32
 	
+	
 	// **************************************** PSAPI ************************
+	
 	typedef struct _MODULEINFO {
 			LPVOID lpBaseOfDll;
 			DWORD SizeOfImage;
 			LPVOID EntryPoint;
 	} MODULEINFO, *LPMODULEINFO;
 	
-	BOOL GetModuleListPSAPI(HANDLE hProcess) {
-		// EnumProcessModules()
-		typedef BOOL (
-			__stdcall *tEPM
-		)(HANDLE hProcess, HMODULE *lphModule, DWORD cb, LPDWORD lpcbNeeded);
-		// GetModuleFileNameEx()
-		typedef DWORD (
-			__stdcall *tGMFNE
-		)(HANDLE hProcess, HMODULE hModule, LPSTR lpFilename, DWORD nSize);
-		// GetModuleBaseName()
-		typedef DWORD (
-			__stdcall *tGMBN
-		)(HANDLE hProcess, HMODULE hModule, LPSTR lpFilename, DWORD nSize);
-		// GetModuleInformation()
-		typedef BOOL (
-			__stdcall *tGMI
-		)(HANDLE hProcess, HMODULE hModule, LPMODULEINFO pmi, DWORD nSize);
+	// EnumProcessModules()
+	typedef BOOL (__stdcall *tEPM)(
+		HANDLE hProcess, HMODULE *lphModule, DWORD cb, LPDWORD lpcbNeeded
+	);
+	// GetModuleFileNameEx()
+	typedef DWORD (__stdcall *tGMFNE)(
+		HANDLE hProcess, HMODULE hModule, LPSTR lpFilename, DWORD nSize
+	);
+	// GetModuleBaseName()
+	typedef DWORD (__stdcall *tGMBN)(
+		HANDLE hProcess, HMODULE hModule, LPSTR lpFilename, DWORD nSize
+	);
+	// GetModuleInformation()
+	typedef BOOL (__stdcall *tGMI)(
+		HANDLE hProcess, HMODULE hModule, LPMODULEINFO pmi, DWORD nSize
+	);
 	
+	
+	bool loadPsapi(
+		HINSTANCE *hPsapi,
+		tEPM *pEPM,
+		tGMFNE *pGMFNE,
+		tGMBN *pGMBN,
+		tGMI *pGMI
+	) {
+		
+		*hPsapi = LoadLibrary(_T("psapi.dll"));
+		if (*hPsapi == NULL) {
+			return false;
+		}
+		
+		*pEPM = (tEPM) GetProcAddress(*hPsapi, "EnumProcessModules");
+		*pGMFNE = (tGMFNE) GetProcAddress(*hPsapi, "GetModuleFileNameExA");
+		*pGMBN = (tGMFNE) GetProcAddress(*hPsapi, "GetModuleBaseNameA");
+		*pGMI = (tGMI) GetProcAddress(*hPsapi, "GetModuleInformation");
+		
+		if (
+			*pEPM == NULL ||
+			*pGMFNE == NULL ||
+			*pGMBN == NULL ||
+			*pGMI == NULL
+		) {
+			// we couldn't find all functions
+			FreeLibrary(*hPsapi);
+			return false;
+		}
+		
+		return true;
+		
+	}
+	
+	
+	bool allocMods(HMODULE **hMods, char **tt, char **tt2) {
+		*hMods = reinterpret_cast<HMODULE*>(
+			malloc(sizeof(HMODULE) * (TTBUFLEN / sizeof HMODULE))
+		);
+		*tt = reinterpret_cast<char*>(
+			malloc(sizeof(char) * TTBUFLEN)
+		);
+		*tt2 = reinterpret_cast<char*>(
+			malloc(sizeof(char) * TTBUFLEN)
+		);
+		return !(*hMods == NULL || *tt == NULL || *tt2 == NULL);
+	}
+	
+	
+	void freeMods(HMODULE *hMods, char *tt, char *tt2) {
+		if (tt2 != NULL) {
+			free(tt2);
+		}
+		if (tt != NULL) {
+			free(tt);
+		}
+		if (hMods != NULL) {
+			free(hMods);
+		}
+	}
+	
+	
+	BOOL GetModuleListPSAPI(HANDLE hProcess) {
+		
+		DWORD i;
+		DWORD cbNeeded;
+		MODULEINFO mi;
+		
+		int cnt = 0;
+		
 		HINSTANCE hPsapi;
 		tEPM pEPM;
 		tGMFNE pGMFNE;
 		tGMBN pGMBN;
 		tGMI pGMI;
-	
-		DWORD i;
-		//ModuleEntry e;
-		DWORD cbNeeded;
-		MODULEINFO mi;
-		HMODULE *hMods = 0;
-		char *tt = NULL;
-		char *tt2 = NULL;
-		const SIZE_T TTBUFLEN = 8096;
-		int cnt = 0;
-	
-		hPsapi = LoadLibrary(_T("psapi.dll"));
-		if (hPsapi == NULL) {
+		if (!loadPsapi(&hPsapi, &pEPM, &pGMFNE, &pGMBN, &pGMI)) {
 			return FALSE;
 		}
 		
-		pEPM = (tEPM) GetProcAddress(hPsapi, "EnumProcessModules");
-		pGMFNE = (tGMFNE) GetProcAddress(hPsapi, "GetModuleFileNameExA");
-		pGMBN = (tGMFNE) GetProcAddress(hPsapi, "GetModuleBaseNameA");
-		pGMI = (tGMI) GetProcAddress(hPsapi, "GetModuleInformation");
-		if ((pEPM == NULL) || (pGMFNE == NULL) || (pGMBN == NULL) || (pGMI == NULL)) {
-			// we couldn't find all functions
-			FreeLibrary(hPsapi);
-			return FALSE;
-		}
-		
-		hMods = reinterpret_cast<HMODULE*>(
-			malloc(sizeof(HMODULE) * (TTBUFLEN / sizeof HMODULE))
-		);
-		tt = reinterpret_cast<char*>(
-			malloc(sizeof(char) * TTBUFLEN)
-		);
-		tt2 = reinterpret_cast<char*>(
-			malloc(sizeof(char) * TTBUFLEN)
-		);
-		if ((hMods == NULL) || (tt == NULL) || (tt2 == NULL)) {
+		HMODULE *hMods;
+		char *tt;
+		char *tt2;
+		if (!allocMods(&hMods, &tt, &tt2)) {
 			goto cleanup;
 		}
 		
@@ -409,7 +455,9 @@ private:
 			tt2[0] = 0;
 			pGMBN(hProcess, hMods[i], tt2, TTBUFLEN);
 			
-			DWORD dwRes = this->LoadModule(hProcess, tt, tt2, (DWORD64) mi.lpBaseOfDll, mi.SizeOfImage);
+			DWORD dwRes = this->LoadModule(
+				hProcess, tt, tt2, (DWORD64) mi.lpBaseOfDll, mi.SizeOfImage
+			);
 			if (dwRes != ERROR_SUCCESS) {
 				GetLastError();
 			}
@@ -417,11 +465,10 @@ private:
 		}
 		
 	cleanup:
-		if (hPsapi != NULL) FreeLibrary(hPsapi);
-		if (tt2 != NULL) free(tt2);
-		if (tt != NULL) free(tt);
-		if (hMods != NULL) free(hMods);
-	
+		if (hPsapi != NULL) {
+			FreeLibrary(hPsapi);
+		}
+		freeMods(hMods, tt, tt2);
 		return cnt != 0;
 	}  // GetModuleListPSAPI
 	
