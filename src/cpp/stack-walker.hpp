@@ -1,16 +1,5 @@
-/**********************************************************************
- *
- * StackWalker.h
- *
- *
- * History:
- *  2005-07-27   v1    - First public release on http://www.codeproject.com/
- *  (for additional changes see History in 'StackWalker.cpp'!
- *
- **********************************************************************/
-// #pragma once is supported starting with _MCS_VER 1000,
-// so we need not to check the version (because we only support _MSC_VER >= 1100)!
-#pragma once
+#ifndef _STACK_WALKER_HPP_
+#define _STACK_WALKER_HPP_
 
 #include <windows.h>
 #include <stdio.h>
@@ -18,6 +7,25 @@
 
 
 class StackWalkerInternal;  // forward
+
+#define STACKWALK_MAX_NAMELEN 1024
+
+// Entry for each Callstack-Entry
+struct CallstackEntry {
+	DWORD64 offset;  // if 0, we have no valid entry
+	CHAR name[STACKWALK_MAX_NAMELEN];
+	CHAR undName[STACKWALK_MAX_NAMELEN];
+	CHAR undFullName[STACKWALK_MAX_NAMELEN];
+	DWORD64 offsetFromSmybol;
+	DWORD offsetFromLine;
+	DWORD lineNumber;
+	CHAR lineFileName[STACKWALK_MAX_NAMELEN];
+	DWORD symType;
+	LPCSTR symTypeString;
+	CHAR moduleName[STACKWALK_MAX_NAMELEN];
+	DWORD64 baseOfImage;
+	CHAR loadedImageName[STACKWALK_MAX_NAMELEN];
+};
 
 class StackWalker {
 public:
@@ -84,24 +92,6 @@ public:
 	);
 	
 protected:
-	enum { STACKWALK_MAX_NAMELEN = 1024 }; // max name length for found symbols
-	
-	// Entry for each Callstack-Entry
-	typedef struct CallstackEntry {
-		DWORD64 offset;  // if 0, we have no valid entry
-		CHAR name[STACKWALK_MAX_NAMELEN];
-		CHAR undName[STACKWALK_MAX_NAMELEN];
-		CHAR undFullName[STACKWALK_MAX_NAMELEN];
-		DWORD64 offsetFromSmybol;
-		DWORD offsetFromLine;
-		DWORD lineNumber;
-		CHAR lineFileName[STACKWALK_MAX_NAMELEN];
-		DWORD symType;
-		LPCSTR symTypeString;
-		CHAR moduleName[STACKWALK_MAX_NAMELEN];
-		DWORD64 baseOfImage;
-		CHAR loadedImageName[STACKWALK_MAX_NAMELEN];
-	} CallstackEntry;
 	
 	enum CallstackEntryType {
 		firstEntry,
@@ -142,3 +132,6 @@ protected:
 	
 	friend StackWalkerInternal;
 };
+
+
+#endif /* _STACK_WALKER_HPP_ */

@@ -80,7 +80,7 @@ SEGFAULT_HANDLER {
 	n = SNPRINTF(
 		sbuff,
 		BUFF_SIZE,
-		"PID %d received SIGSEGV for address: 0x%llu\n",
+		"PID %d received SIGSEGV for address: 0x%llx\n",
 		pid,
 		outAddr
 	);
