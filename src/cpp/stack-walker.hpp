@@ -112,6 +112,12 @@ protected:
 	virtual void OnCallstackEntry(CallstackEntryType eType, CallstackEntry *entry);
 	virtual void OnOutput(LPCSTR szText);
 	
+	inline void iterateFrames(
+		HANDLE hThread,
+		CONTEXT &c,
+		void *_pSym
+	);
+	
 	StackWalkerInternal *m_sw;
 	HANDLE m_hProcess;
 	DWORD m_dwProcessId;

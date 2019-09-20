@@ -242,34 +242,13 @@ inline void initEntityStrings(CallstackEntry *csEntry) {
 }
 
 
-BOOL StackWalker::ShowCallstack(
+inline void StackWalker::iterateFrames(
 	HANDLE hThread,
-	const CONTEXT *context,
-	PReadProcessMemoryRoutine readMemoryFunction,
-	LPVOID pUserData
+	CONTEXT &c,
+	void *_pSym
 ) {
-	CONTEXT c;
-	CallstackEntry csEntry;
-	IMAGEHLP_SYMBOL64 *pSym = NULL;
-	StackWalkerInternal::IMAGEHLP_MODULE64_V2 Module;
-	IMAGEHLP_LINE64 Line;
-	int frameNum;
 	
-	if (m_modulesLoaded == FALSE) {
-		this->LoadModules();  // ignore the result...
-	}
-	
-	if (this->m_sw->m_hDbhHelp == NULL) {
-		SetLastError(ERROR_DLL_INIT_FAILED);
-		return FALSE;
-	}
-	
-	s_readMemoryFunction = readMemoryFunction;
-	s_readMemoryFunction_UserData = pUserData;
-	
-	if (!getValidContext(context, hThread, &c)) {
-		return FALSE;
-	}
+	IMAGEHLP_SYMBOL64 *pSym = reinterpret_cast<IMAGEHLP_SYMBOL64*>(_pSym);
 	
 	// init STACKFRAME for first call
 	STACKFRAME64 s; // in/out stackframe
@@ -294,24 +273,20 @@ BOOL StackWalker::ShowCallstack(
 	s.AddrStack.Offset = c.IntSp;
 	s.AddrStack.Mode = AddrModeFlat;
 #else
-#error "Platform not supported!"
+	#error "Platform not supported!"
 #endif
 	
-	pSym = reinterpret_cast<IMAGEHLP_SYMBOL64*>(
-		malloc(sizeof(IMAGEHLP_SYMBOL64) + STACKWALK_MAX_NAMELEN)
-	);
-	if (!pSym) goto cleanup;  // not enough memory...
-	memset(pSym, 0, sizeof(IMAGEHLP_SYMBOL64) + STACKWALK_MAX_NAMELEN);
-	pSym->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
-	pSym->MaxNameLength = STACKWALK_MAX_NAMELEN;
+	CallstackEntry csEntry;
 	
-	memset(&Line, 0, sizeof(Line));
-	Line.SizeOfStruct = sizeof(Line);
-	
+	StackWalkerInternal::IMAGEHLP_MODULE64_V2 Module;
 	memset(&Module, 0, sizeof(Module));
 	Module.SizeOfStruct = sizeof(Module);
 	
-	for (frameNum = 0; ; ++frameNum) {
+	IMAGEHLP_LINE64 Line;
+	memset(&Line, 0, sizeof(Line));
+	Line.SizeOfStruct = sizeof(Line);
+	
+	for (int frameNum = 0; ; ++frameNum) {
 		// get next stack frame (StackWalk64(), SymFunctionTableAccess64(), SymGetModuleBase64())
 		// if this returns ERROR_INVALID_ADDRESS (487) or ERROR_NOACCESS (998), you can
 		// assume that either you are done, or that the stack is so hosed that the next
@@ -408,7 +383,48 @@ BOOL StackWalker::ShowCallstack(
 			break;
 		}
 	} // for (frameNum)
-		
+	
+}
+
+
+BOOL StackWalker::ShowCallstack(
+	HANDLE hThread,
+	const CONTEXT *context,
+	PReadProcessMemoryRoutine readMemoryFunction,
+	LPVOID pUserData
+) {
+	CONTEXT c;
+	
+	if (m_modulesLoaded == FALSE) {
+		this->LoadModules();  // ignore the result...
+	}
+	
+	if (this->m_sw->m_hDbhHelp == NULL) {
+		SetLastError(ERROR_DLL_INIT_FAILED);
+		return FALSE;
+	}
+	
+	s_readMemoryFunction = readMemoryFunction;
+	s_readMemoryFunction_UserData = pUserData;
+	
+	if (!getValidContext(context, hThread, &c)) {
+		return FALSE;
+	}
+	
+	IMAGEHLP_SYMBOL64 *pSym = reinterpret_cast<IMAGEHLP_SYMBOL64*>(
+		malloc(sizeof(IMAGEHLP_SYMBOL64) + STACKWALK_MAX_NAMELEN)
+	);
+	if (!pSym) {
+		goto cleanup;  // not enough memory...
+	}
+	
+	memset(pSym, 0, sizeof(IMAGEHLP_SYMBOL64) + STACKWALK_MAX_NAMELEN);
+	pSym->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
+	pSym->MaxNameLength = STACKWALK_MAX_NAMELEN;
+	
+	
+	iterateFrames(hThread, c, pSym);
+	
 	cleanup:
 	if (pSym) {
 		free(pSym);
@@ -419,6 +435,7 @@ BOOL StackWalker::ShowCallstack(
 	}
 	
 	return TRUE;
+	
 }
 
 
