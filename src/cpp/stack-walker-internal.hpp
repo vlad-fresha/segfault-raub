@@ -40,7 +40,7 @@ public:
 	}
 	
 	
-	void loadDbgHelpDll() {
+	bool loadDbgHelpDll() {
 		// First try to load the newsest one from
 		TCHAR szTemp[4096];
 		// But before we do this, we first check if the ".local" file exists
@@ -73,27 +73,21 @@ public:
 		if (m_hDbhHelp == NULL) {
 			m_hDbhHelp = LoadLibrary(_T("dbghelp.dll"));
 		}
+		
+		return m_hDbhHelp != NULL;
+		
 	}
 	
 	
-	BOOL Init(LPCSTR szSymPath) {
-		if (m_parent == NULL) {
-			return FALSE;
-		}
-		// Dynamically load the Entry-Points for dbghelp.dll:
-		
-		loadDbgHelpDll();
-		if (m_hDbhHelp == NULL) {
-			return FALSE;
-		}
+	bool loadDbgFuncs() {
 		
 		pSI = (tSI) GetProcAddress(m_hDbhHelp, "SymInitialize");
 		pSC = (tSC) GetProcAddress(m_hDbhHelp, "SymCleanup");
-
+	
 		pSW = (tSW) GetProcAddress(m_hDbhHelp, "StackWalk64");
 		pSGO = (tSGO) GetProcAddress(m_hDbhHelp, "SymGetOptions");
 		pSSO = (tSSO) GetProcAddress(m_hDbhHelp, "SymSetOptions");
-
+	
 		pSFTA = (tSFTA) GetProcAddress(m_hDbhHelp, "SymFunctionTableAccess64");
 		pSGLFA = (tSGLFA) GetProcAddress(m_hDbhHelp, "SymGetLineFromAddr64");
 		pSGMB = (tSGMB) GetProcAddress(m_hDbhHelp, "SymGetModuleBase64");
@@ -104,11 +98,26 @@ public:
 		pSLM = (tSLM) GetProcAddress(m_hDbhHelp, "SymLoadModule64");
 		pSGSP =(tSGSP) GetProcAddress(m_hDbhHelp, "SymGetSearchPath");
 		
-		if (
+		return !(
 			pSC == NULL || pSFTA == NULL || pSGMB == NULL || pSGMI == NULL ||
 			pSGO == NULL || pSGSFA == NULL || pSI == NULL || pSSO == NULL ||
 			pSW == NULL || pUDSN == NULL || pSLM == NULL
-		) {
+		);
+		
+	}
+	
+	
+	BOOL Init(LPCSTR szSymPath) {
+		if (m_parent == NULL) {
+			return FALSE;
+		}
+		
+		// Dynamically load the Entry-Points for dbghelp.dll:
+		if (!loadDbgHelpDll()) {
+			return FALSE;
+		}
+		
+		if (!loadDbgFuncs()) {
 			FreeLibrary(m_hDbhHelp);
 			m_hDbhHelp = NULL;
 			pSC = NULL;
@@ -123,7 +132,7 @@ public:
 			GetLastError();
 		}
 		
-		DWORD symOptions = this->pSGO();  // SymGetOptions
+		DWORD symOptions = this->pSGO(); // SymGetOptions
 		symOptions |= SYMOPT_LOAD_LINES;
 		symOptions |= SYMOPT_FAIL_CRITICAL_ERRORS;
 		//symOptions |= SYMOPT_NO_PROMPTS;
