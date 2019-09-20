@@ -257,7 +257,7 @@ inline void initEntityStrings(CallstackEntry *csEntry) {
 
 inline void StackWalker::iterateFrames(
 	HANDLE hThread,
-	CONTEXT &c,
+	CONTEXT *c,
 	void *_pSym
 ) {
 	
@@ -269,21 +269,21 @@ inline void StackWalker::iterateFrames(
 	DWORD imageType;
 #ifdef _M_X64
 	imageType = IMAGE_FILE_MACHINE_AMD64;
-	s.AddrPC.Offset = c.Rip;
+	s.AddrPC.Offset = c->Rip;
 	s.AddrPC.Mode = AddrModeFlat;
-	s.AddrFrame.Offset = c.Rsp;
+	s.AddrFrame.Offset = c->Rsp;
 	s.AddrFrame.Mode = AddrModeFlat;
-	s.AddrStack.Offset = c.Rsp;
+	s.AddrStack.Offset = c->Rsp;
 	s.AddrStack.Mode = AddrModeFlat;
 #elif _M_IA64
 	imageType = IMAGE_FILE_MACHINE_IA64;
-	s.AddrPC.Offset = c.StIIP;
+	s.AddrPC.Offset = c->StIIP;
 	s.AddrPC.Mode = AddrModeFlat;
-	s.AddrFrame.Offset = c.IntSp;
+	s.AddrFrame.Offset = c->IntSp;
 	s.AddrFrame.Mode = AddrModeFlat;
-	s.AddrBStore.Offset = c.RsBSP;
+	s.AddrBStore.Offset = c->RsBSP;
 	s.AddrBStore.Mode = AddrModeFlat;
-	s.AddrStack.Offset = c.IntSp;
+	s.AddrStack.Offset = c->IntSp;
 	s.AddrStack.Mode = AddrModeFlat;
 #else
 	#error "Platform not supported!"
@@ -311,7 +311,7 @@ inline void StackWalker::iterateFrames(
 				this->m_hProcess,
 				hThread,
 				&s,
-				&c,
+				c,
 				myReadProcMem,
 				this->m_sw->pSFTA,
 				this->m_sw->pSGMB,
@@ -436,7 +436,7 @@ BOOL StackWalker::ShowCallstack(
 	pSym->MaxNameLength = STACKWALK_MAX_NAMELEN;
 	
 	
-	iterateFrames(hThread, c, pSym);
+	iterateFrames(hThread, &c, pSym);
 	
 	cleanup:
 	if (pSym) {

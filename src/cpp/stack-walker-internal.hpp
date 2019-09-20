@@ -40,14 +40,10 @@ public:
 	}
 	
 	
-	BOOL Init(LPCSTR szSymPath) {
-		if (m_parent == NULL) {
-			return FALSE;
-		}
-		// Dynamically load the Entry-Points for dbghelp.dll:
+	void loadDbgHelpDll() {
 		// First try to load the newsest one from
 		TCHAR szTemp[4096];
-		// But before wqe do this, we first check if the ".local" file exists
+		// But before we do this, we first check if the ".local" file exists
 		if (GetModuleFileName(NULL, szTemp, 4096) > 0) {
 			_tcscat_s(szTemp, _T(".local"));
 			if (GetFileAttributes(szTemp) == INVALID_FILE_ATTRIBUTES) {
@@ -77,9 +73,20 @@ public:
 		if (m_hDbhHelp == NULL) {
 			m_hDbhHelp = LoadLibrary(_T("dbghelp.dll"));
 		}
+	}
+	
+	
+	BOOL Init(LPCSTR szSymPath) {
+		if (m_parent == NULL) {
+			return FALSE;
+		}
+		// Dynamically load the Entry-Points for dbghelp.dll:
+		
+		loadDbgHelpDll();
 		if (m_hDbhHelp == NULL) {
 			return FALSE;
 		}
+		
 		pSI = (tSI) GetProcAddress(m_hDbhHelp, "SymInitialize");
 		pSC = (tSC) GetProcAddress(m_hDbhHelp, "SymCleanup");
 
@@ -410,6 +417,41 @@ private:
 	}  // GetModuleListPSAPI
 	
 	
+	ULONGLONG getFileVersion(CHAR *szImg) {
+		ULONGLONG fileVersion = 0;
+		// try to retrive the file-version:
+		if ((this->m_parent->m_options & StackWalker::RetrieveFileVersion) != 0) {
+			VS_FIXEDFILEINFO *fInfo = NULL;
+			DWORD dwHandle;
+			DWORD dwSize = GetFileVersionInfoSizeA(szImg, &dwHandle);
+			if (dwSize > 0) {
+				LPVOID vData = malloc(dwSize);
+				if (vData != NULL) {
+					if (GetFileVersionInfoA(szImg, dwHandle, dwSize, vData) != 0) {
+						UINT len;
+						TCHAR szSubBlock[] = _T("\\");
+						if (
+							VerQueryValue(
+								vData,
+								szSubBlock,
+								reinterpret_cast<LPVOID*>(&fInfo),
+								&len
+							) == 0
+						) {
+							fInfo = NULL;
+						} else {
+							fileVersion = ((ULONGLONG)fInfo->dwFileVersionLS) +
+								((ULONGLONG)fInfo->dwFileVersionMS << 32);
+						}
+					}
+					free(vData);
+				}
+			}
+		}
+		return fileVersion;
+	}
+	
+	
 	DWORD LoadModule(
 		HANDLE hProcess,
 		LPCSTR img,
@@ -426,37 +468,10 @@ private:
 			if (pSLM(hProcess, 0, szImg, szMod, baseAddr, size) == 0)
 				result = GetLastError();
 		}
-		ULONGLONG fileVersion = 0;
+		
 		if ((m_parent != NULL) && (szImg != NULL)) {
 			// try to retrive the file-version:
-			if ((this->m_parent->m_options & StackWalker::RetrieveFileVersion) != 0) {
-				VS_FIXEDFILEINFO *fInfo = NULL;
-				DWORD dwHandle;
-				DWORD dwSize = GetFileVersionInfoSizeA(szImg, &dwHandle);
-				if (dwSize > 0) {
-					LPVOID vData = malloc(dwSize);
-					if (vData != NULL) {
-						if (GetFileVersionInfoA(szImg, dwHandle, dwSize, vData) != 0) {
-							UINT len;
-							TCHAR szSubBlock[] = _T("\\");
-							if (
-								VerQueryValue(
-									vData,
-									szSubBlock,
-									reinterpret_cast<LPVOID*>(&fInfo),
-									&len
-								) == 0
-							) {
-								fInfo = NULL;
-							} else {
-								fileVersion = ((ULONGLONG)fInfo->dwFileVersionLS) +
-									((ULONGLONG)fInfo->dwFileVersionMS << 32);
-							}
-						}
-						free(vData);
-					}
-				}
-			}
+			ULONGLONG fileVersion = getFileVersion(szImg);
 			
 			// Retrive some additional-infos about the module
 			IMAGEHLP_MODULE64_V2 Module;
@@ -497,8 +512,12 @@ private:
 				result, szSymType, Module.LoadedImageName, fileVersion
 			);
 		}
-		if (szImg != NULL) free(szImg);
-		if (szMod != NULL) free(szMod);
+		if (szImg != NULL) {
+			free(szImg);
+		}
+		if (szMod != NULL) {
+			free(szMod);
+		}
 		return result;
 	}
 	

@@ -114,7 +114,7 @@ protected:
 	
 	inline void iterateFrames(
 		HANDLE hThread,
-		CONTEXT &c,
+		CONTEXT *c,
 		void *_pSym
 	);
 	inline void buildSymPath(char *szSymPath);
