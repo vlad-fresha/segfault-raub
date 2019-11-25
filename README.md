@@ -13,8 +13,8 @@ This is a part of [Node3D](https://github.com/node-3d) project.
 ## Synopsis
 
 If a **SIGSEGV** signal is raised, the module will print a native stack trace to both
-STDERR and to a timestamped file. This module does nothing (zero perf impact) as long
-as Node is well-behaved.
+**STDERR** and to a timestamped file. This module does nothing (zero perf impact) as
+long as Node is well-behaved.
 
 > Note: this **addon uses N-API**, and therefore is ABI-compatible across different
 Node.js versions. Addon binaries are precompiled and **there is no compilation**
