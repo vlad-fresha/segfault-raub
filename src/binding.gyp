@@ -38,7 +38,7 @@
 							]
 						},
 						'VCLinkerTool' : {
-							'AdditionalOptions' : ['/DEBUG:NONE'],
+							'AdditionalOptions' : ['/DEBUG:NONE', '/LTCG'],
 						},
 					},
 				},
