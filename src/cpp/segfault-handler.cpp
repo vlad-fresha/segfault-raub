@@ -64,10 +64,16 @@ SEGFAULT_HANDLER {
 	
 	pid = GETPID();
 	
-	time_t now;
-	time(&now);
-	SNPRINTF(sbuff, BUFF_SIZE, "segfault-%d-%d.log", pid, static_cast<int>(now));
-	fd = OPEN(sbuff, O_FLAGS, S_FLAGS);
+	if(access("segfault.log", F_OK) != -1) {
+		fd = OPEN("segfault.log", O_FLAGS, S_FLAGS);
+	} else {
+		fprintf(
+			stderr,
+			"NOTE: The segfault won't be logged into a file, unless 'segfault.log' exists.\n"
+		);
+		fd = 0;
+	}
+	
 	
 	#ifdef _WIN32
 		address = reinterpret_cast<size_t>(exceptionInfo->ExceptionRecord->ExceptionAddress);
@@ -80,7 +86,7 @@ SEGFAULT_HANDLER {
 	n = SNPRINTF(
 		sbuff,
 		BUFF_SIZE,
-		"PID %d received SIGSEGV for address: 0x%llx\n",
+		"\nPID %d received SIGSEGV for address: 0x%llx\n",
 		pid,
 		outAddr
 	);
