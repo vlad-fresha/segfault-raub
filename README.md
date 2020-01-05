@@ -7,14 +7,15 @@ This is a part of [Node3D](https://github.com/node-3d) project.
 [![Build Status](https://api.travis-ci.com/node-3d/segfault-raub.svg?branch=master)](https://travis-ci.com/node-3d/segfault-raub)
 [![CodeFactor](https://www.codefactor.io/repository/github/node-3d/segfault-raub/badge)](https://www.codefactor.io/repository/github/node-3d/segfault-raub)
 
-> npm i webaudio-raub
+> npm i segfault-raub
 
 
 ## Synopsis
 
+This module does nothing (zero perf impact) as long as Node is well-behaved.
 If a **SIGSEGV** signal is raised, the module will print a native stack trace to both
-**STDERR** and to a timestamped file. This module does nothing (zero perf impact) as
-long as Node is well-behaved.
+**STDERR** and to the "segfault.log" file (if exists). If there is no such file, it
+**won't be created**, so it is up to you if the log-file is needed.
 
 > Note: this **addon uses N-API**, and therefore is ABI-compatible across different
 Node.js versions. Addon binaries are precompiled and **there is no compilation**

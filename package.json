@@ -1,7 +1,7 @@
 {
 	"author": "Luis Blanco <luisblanco1337@gmail.com>",
 	"name": "segfault-raub",
-	"version": "1.0.0",
+	"version": "1.1.0",
 	"description": "Catches SIGSEGV and prints diagnostic information",
 	"main": "index.js",
 	"license": "BSD-3-Clause",
@@ -26,7 +26,7 @@
 		"README.md"
 	],
 	"config": {
-		"install": "v1.0.0"
+		"install": "v1.1.0"
 	},
 	"scripts": {
 		"postinstall": "node install"
