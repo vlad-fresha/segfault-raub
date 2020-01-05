@@ -61,11 +61,15 @@ SEGFAULT_HANDLER {
 	int n; // chars written to buffer
 	int fd;
 	int pid;
+	time_t result;
 	
 	pid = GETPID();
 	
 	if(access("segfault.log", F_OK) != -1) {
 		fd = OPEN("segfault.log", O_FLAGS, S_FLAGS);
+		result = time(NULL);
+		n = SNPRINTF(sbuff, BUFF_SIZE, "\n\nAt %s", ctime(&result));
+		WRITE(fd, sbuff, n);
 	} else {
 		fprintf(
 			stderr,
