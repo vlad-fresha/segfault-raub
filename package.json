@@ -1,7 +1,7 @@
 {
 	"author": "Luis Blanco <luisblanco1337@gmail.com>",
 	"name": "segfault-raub",
-	"version": "1.1.1",
+	"version": "1.1.2",
 	"description": "Catches SIGSEGV and prints diagnostic information",
 	"main": "index.js",
 	"license": "BSD-3-Clause",
@@ -40,6 +40,6 @@
 		"url": "https://github.com/node-3d/segfault-raub.git"
 	},
 	"dependencies": {
-		"addon-tools-raub": "5.1.0"
+		"addon-tools-raub": "5.1.x"
 	}
 }
