@@ -154,11 +154,6 @@ void RegisterHandler() {
 	#ifdef _WIN32
 		AddVectoredExceptionHandler(1, segfault_handler);
 	#else
-		struct sigaction sa;
-		memset(&sa, 0, sizeof(struct sigaction));
-		sigemptyset(&sa.sa_mask);
-		sa.sa_sigaction = segfault_handler;
-		sa.sa_flags   = SA_SIGINFO | SA_RESETHAND;
-		sigaction(SIGSEGV, &sa, NULL);
+		node::RegisterSignalHandler(SIGSEGV, segfault_handler, false);
 	#endif
 }
