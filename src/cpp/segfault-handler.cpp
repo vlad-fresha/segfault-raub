@@ -21,6 +21,7 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <node.h>
 #endif
 
 #include "segfault-handler.hpp"
