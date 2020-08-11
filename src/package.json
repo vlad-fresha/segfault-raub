@@ -6,6 +6,6 @@
 		"build": "node-gyp rebuild && node -e \"require('addon-tools-raub/cpbin')('segfault')\""
 	},
 	"dependencies": {
-		"addon-tools-raub": "5.1.x"
+		"addon-tools-raub": "5.2.x"
 	}
 }
