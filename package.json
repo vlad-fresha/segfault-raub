@@ -26,7 +26,7 @@
 		"README.md"
 	],
 	"config": {
-		"install": "v1.1.0"
+		"install": "v1.1.3"
 	},
 	"scripts": {
 		"postinstall": "node install"
