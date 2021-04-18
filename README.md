@@ -3,11 +3,11 @@
 This is a part of [Node3D](https://github.com/node-3d) project.
 
 [![NPM](https://nodei.co/npm/segfault-raub.png?compact=true)](https://www.npmjs.com/package/segfault-raub)
-
-[![Build Status](https://api.travis-ci.com/node-3d/segfault-raub.svg?branch=master)](https://travis-ci.com/node-3d/segfault-raub)
 [![CodeFactor](https://www.codefactor.io/repository/github/node-3d/segfault-raub/badge)](https://www.codefactor.io/repository/github/node-3d/segfault-raub)
 
-> npm i segfault-raub
+```
+npm i segfault-raub
+```
 
 
 ## Synopsis
@@ -47,7 +47,7 @@ In doing so, you will cause a segfault (accessing 0x01 pointer), and see how it 
 This is a fork of [segfault-handler](https://github.com/ddopson/node-segfault-handler).
 The original licensing rules seem to apply, presumably (LICENSE is kept untouched).
 
-This software is licensed for use under the BSD license.
+This software is licensed for use under the BSD-3 Clause license.
 
 Also this project uses [callstack walker](https://github.com/JochenKalmbach/StackWalker)
-which is also BSD licensed.
+which is licensed under BSD-2 Clause.
