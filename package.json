@@ -20,7 +20,7 @@
 	"files": [
 		"include",
 		"index.js",
-		"index.d.js",
+		"index.d.ts",
 		"install.js",
 		"LICENSE",
 		"package.json",
