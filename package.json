@@ -36,7 +36,8 @@
 	},
 	"jest": {
 		"moduleFileExtensions": [
-			"js", "node"
+			"js",
+			"node"
 		],
 		"testMatch": [
 			"**/*.test.js"
