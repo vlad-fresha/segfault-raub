@@ -12,7 +12,7 @@ class StackWalkerInternal;  // forward
 
 // Entry for each Callstack-Entry
 struct CallstackEntry {
-	DWORD64 offset;  // if 0, we have no valid entry
+	DWORD64 offset; // if 0, we have no valid entry
 	CHAR name[STACKWALK_MAX_NAMELEN];
 	CHAR undName[STACKWALK_MAX_NAMELEN];
 	CHAR undFullName[STACKWALK_MAX_NAMELEN];

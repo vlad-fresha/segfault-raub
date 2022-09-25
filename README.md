@@ -9,9 +9,6 @@ This is a part of [Node3D](https://github.com/node-3d) project.
 npm i segfault-raub
 ```
 
-
-## Synopsis
-
 This module does nothing (zero perf impact) as long as Node is well-behaved.
 If a **SIGSEGV** signal is raised, the module will print a native stack trace to both
 **STDERR** and to the "segfault.log" file (if exists). If there is no such file, it
@@ -44,10 +41,10 @@ In doing so, you will cause a segfault (accessing 0x01 pointer), and see how it 
 
 ## Legal notice
 
-This is a fork of [segfault-handler](https://github.com/ddopson/node-segfault-handler).
-The original licensing rules seem to apply, presumably (LICENSE is kept untouched).
-
-This software is licensed for use under the BSD-3 Clause license.
+This package is derived from [segfault-handler](https://github.com/ddopson/node-segfault-handler).
+The original licensing rules apply, see `LICENSE_node-segfault-handler`.
 
 Also this project uses [callstack walker](https://github.com/JochenKalmbach/StackWalker)
 which is licensed under BSD-2 Clause.
+
+The rest of this package (the newly introduced files) is licensed under MIT.

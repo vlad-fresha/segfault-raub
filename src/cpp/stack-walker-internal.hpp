@@ -83,7 +83,6 @@ public:
 	
 	
 	bool loadDbgFuncs() {
-		
 		pSI = (tSI) GetProcAddress(m_hDbhHelp, "SymInitialize");
 		pSC = (tSC) GetProcAddress(m_hDbhHelp, "SymCleanup");
 	
@@ -106,7 +105,6 @@ public:
 			pSGO == NULL || pSGSFA == NULL || pSI == NULL || pSSO == NULL ||
 			pSW == NULL || pUDSN == NULL || pSLM == NULL
 		);
-		
 	}
 	
 	

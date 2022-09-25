@@ -21,6 +21,7 @@ StackWalker::StackWalker(DWORD dwProcessId, HANDLE hProcess) {
 	this->m_dwProcessId = dwProcessId;
 	this->m_szSymPath = NULL;
 }
+
 StackWalker::StackWalker(
 	int fDescriptor,
 	int options,
@@ -55,7 +56,6 @@ StackWalker::~StackWalker() {
 const size_t nSymPathLen = 4096;
 
 inline void StackWalker::buildSymPath(char *szSymPath) {
-	
 	szSymPath[0] = 0;
 	
 	// Now first add the (optional) provided sympath:
@@ -128,7 +128,6 @@ inline void StackWalker::buildSymPath(char *szSymPath) {
 			);
 		}
 	}
-	
 }
 
 
@@ -255,12 +254,7 @@ inline void initEntityStrings(CallstackEntry *csEntry) {
 }
 
 
-inline void StackWalker::iterateFrames(
-	HANDLE hThread,
-	CONTEXT *c,
-	void *_pSym
-) {
-	
+inline void StackWalker::iterateFrames(HANDLE hThread, CONTEXT *c, void *_pSym) {
 	IMAGEHLP_SYMBOL64 *pSym = reinterpret_cast<IMAGEHLP_SYMBOL64*>(_pSym);
 	
 	// init STACKFRAME for first call
@@ -396,7 +390,6 @@ inline void StackWalker::iterateFrames(
 			break;
 		}
 	} // for (frameNum)
-	
 }
 
 
@@ -448,7 +441,6 @@ BOOL StackWalker::ShowCallstack(
 	}
 	
 	return TRUE;
-	
 }
 
 
@@ -514,7 +506,6 @@ void StackWalker::OnLoadModule(
 
 
 void StackWalker::OnCallstackEntry(CallstackEntryType eType, CallstackEntry *entry) {
-	
 	CHAR buffer[STACKWALK_MAX_NAMELEN];
 	
 	if ((eType != lastEntry) && (entry->offset != 0)) {
@@ -557,12 +548,10 @@ void StackWalker::OnCallstackEntry(CallstackEntryType eType, CallstackEntry *ent
 		}
 		OnOutput(buffer);
 	}
-	
 }
 
 
 void StackWalker::OnOutput(LPCSTR buffer) {
-	
 	if(m_fDescriptor > 0) {
 		size_t n = strlen(buffer);
 		int written = _write(m_fDescriptor, buffer, n);
@@ -572,5 +561,4 @@ void StackWalker::OnOutput(LPCSTR buffer) {
 	}
 	
 	fprintf(stderr, buffer);
-	
 }
