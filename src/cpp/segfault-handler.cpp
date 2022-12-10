@@ -11,7 +11,7 @@
 #include <windows.h>
 #include "stack-walker.hpp"
 #else
-#include <ccignal>
+#include <signal.h>
 #endif
 
 #include "segfault-handler.hpp"

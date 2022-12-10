@@ -56,7 +56,7 @@ jobs:
       - name: Install Modules
         run: npm ci
 
-      - name: Build Sample Addon
+      - name: Build Current Binary
         run: npm run rebuild-dev
 
       - name: Run Unit Tests
