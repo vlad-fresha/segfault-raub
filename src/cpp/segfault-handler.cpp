@@ -101,7 +101,6 @@ const std::map<uint32_t, std::string> signalNames = {
 	{ SIGTTOU, "SIGTTOU" },
 	{ SIGUSR1, "SIGUSR1" },
 	{ SIGUSR2, "SIGUSR2" },
-	{ SIGPOLL, "SIGPOLL" },
 	{ SIGPROF, "SIGPROF" },
 	{ SIGSYS, "SIGSYS" },
 	{ SIGTRAP, "SIGTRAP" },
@@ -158,7 +157,6 @@ std::map<uint32_t, bool> signalActivity = {
 	{ SIGTTOU, false },
 	{ SIGUSR1, false },
 	{ SIGUSR2, false },
-	{ SIGPOLL, false },
 	{ SIGPROF, false },
 	{ SIGSYS, false },
 	{ SIGTRAP, false },
@@ -396,7 +394,11 @@ void _disableSignal(uint32_t signalId) {
 
 
 JS_METHOD(setSignal) { NAPI_ENV;
-	REQ_INT32_ARG(0, signalId);
+	if (IS_ARG_EMPTY(0)) {
+		RET_UNDEFINED;
+	}
+	
+	LET_INT32_ARG(0, signalId);
 	LET_BOOL_ARG(0, value);
 	
 	if (!signalNames.count(signalId)) {

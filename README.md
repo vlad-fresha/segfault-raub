@@ -99,7 +99,6 @@ causeSegfault();
 | SIGTTOU    |    S     | no      | Background process attempting write.               |
 | SIGUSR1    |    T     | no      | User-defined signal 1.                             |
 | SIGUSR2    |    T     | no      | User-defined signal 2.                             |
-| SIGPOLL    |    T     | no      | Pollable event.                                    |
 | SIGPROF    |    T     | no      | Profiling timer expired.                           |
 | SIGSYS     |    A     | no      | Bad system call.                                   |
 | SIGTRAP    |    A     | no      | Trace/breakpoint trap.                             |
