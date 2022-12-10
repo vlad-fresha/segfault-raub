@@ -9,7 +9,8 @@ const { platform } = require('addon-tools-raub');
 const runAndGetError = async (name) => {
 	let response = '';
 	try {
-		await exec(`node -e "require('.').${name}()"`);
+		const { stderr, stdout } = await exec(`node -e "require('.').${name}()"`);
+		response = stderr + stdout;
 	} catch (error) {
 		response = error.message;
 	}

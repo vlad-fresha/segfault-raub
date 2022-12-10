@@ -286,6 +286,9 @@ SEGFAULT_HANDLER {
 	uint32_t signalId = signalAndAdress.first;
 	uint64_t address = signalAndAdress.second;
 	
+	fprintf(stderr, "%d %s\n", signalId, signalNames.at(signalId).c_str());
+	fflush(stderr);
+	
 	if (!_isSignalEnabled(signalId)) {
 		HANDLER_CANCEL;
 	}
