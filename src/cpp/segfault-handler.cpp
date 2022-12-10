@@ -12,6 +12,8 @@
 #include "stack-walker.hpp"
 #else
 #include <signal.h>
+#include <unistd.h>
+#include <execinfo.h>
 #endif
 
 #include "segfault-handler.hpp"
@@ -24,6 +26,7 @@ constexpr size_t BUFF_SIZE = 256;
 constexpr int F_OK = 0;
 
 #ifdef _WIN32
+	constexpr uint32_t STACK_SIGNAL = EXCEPTION_STACK_OVERFLOW;
 	constexpr auto CLOSE = _close;
 	constexpr auto GETPID = _getpid;
 	constexpr auto OPEN = _open;
@@ -36,6 +39,7 @@ constexpr int F_OK = 0;
 	#define HANDLER_CANCEL return EXCEPTION_CONTINUE_SEARCH
 	#define HANDLER_DONE return EXCEPTION_EXECUTE_HANDLER
 #else
+	constexpr uint32_t STACK_SIGNAL = 0;
 	constexpr auto CLOSE = close;
 	constexpr auto GETPID = getpid;
 	constexpr auto OPEN = open;
@@ -290,13 +294,13 @@ SEGFAULT_HANDLER {
 	
 	int fd = _openLogFile();
 	
-	if (signal != EXCEPTION_STACK_OVERFLOW) {
+	if (signal != STACK_SIGNAL) {
 		_writeTimeToFile(fd);
 	}
 	
 	_writeLogHeader(fd, signal, address);
 	
-	if (signal != EXCEPTION_STACK_OVERFLOW) {
+	if (signal != STACK_SIGNAL) {
 		_writeStackTrace(fd, signal);
 	}
 	
