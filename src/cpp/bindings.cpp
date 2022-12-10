@@ -1,7 +1,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #else
-#include <ccignal>
+#include <signal.h>
 #endif
 
 #include "segfault-handler.hpp"
