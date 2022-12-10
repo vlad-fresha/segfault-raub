@@ -2,47 +2,48 @@
 	'variables': {
 		'bin': '<!(node -p "require(\'addon-tools-raub\').bin")',
 	},
-	'targets': [
-		{
-			'target_name': 'segfault',
-			'sources': [
-				'cpp/bindings.cpp',
-				'cpp/segfault-handler.cpp',
-			],
-			'include_dirs': [
-				'<!@(node -p "require(\'addon-tools-raub\').include")',
-			],
-			'cflags!': ['-fno-exceptions'],
-			'cflags_cc!': ['-fno-exceptions'],
-			'cflags': [ '-O0', '-funwind-tables' ],
-			'xcode_settings': {
+	'targets': [{
+		'target_name': 'segfault',
+		'sources': [
+			'cpp/bindings.cpp',
+			'cpp/segfault-handler.cpp',
+		],
+		'include_dirs': [
+			'<!@(node -p "require(\'addon-tools-raub\').include")',
+		],
+		'defines': ['UNICODE', '_UNICODE'],
+		'cflags_cc': ['-std=c++17'],
+		'cflags': ['-O0', '-funwind-tables'],
+		'conditions': [
+			['OS=="linux"', {
+				'defines': ['__linux__'],
+			}],
+			['OS=="mac"', {
+				'libraries': [
+					'-Wl,-rpath,@loader_path',
+					'-Wl,-rpath,@loader_path/../node_modules/deps-opengl-raub/<(bin)',
+					'-Wl,-rpath,@loader_path/../../deps-opengl-raub/<(bin)',
+					'<(gl_bin)/glfw.dylib',
+				],
 				'MACOSX_DEPLOYMENT_TARGET': '10.9',
-				'OTHER_CFLAGS': [ '-O0', '-funwind-tables' ],
-				'CLANG_CXX_LIBRARY': 'libc++'
-			},
-			'conditions': [[
-			'OS=="win"',
-				{
-					'defines' : [
-						'WIN32_LEAN_AND_MEAN',
-						'VC_EXTRALEAN',
-					],
-					'sources' : [
-						'cpp/stack-walker.cpp',
-					],
-					'msvs_settings' : {
-						'VCCLCompilerTool' : {
-							'DisableSpecificWarnings': ['4996'],
-							'AdditionalOptions' : [
-								'/GL', '/GF', '/EHsc', '/GS', '/Gy', '/GR-',
-							]
-						},
-						'VCLinkerTool' : {
-							'AdditionalOptions' : ['/DEBUG:NONE', '/LTCG'],
-						},
+				'defines': ['__APPLE__'],
+				'CLANG_CXX_LIBRARY': 'libc++',
+				'OTHER_CFLAGS': ['-std=c++17', '-O0', '-funwind-tables'],
+			}],
+			['OS=="win"', {
+				'defines' : ['WIN32_LEAN_AND_MEAN', 'VC_EXTRALEAN', '_WIN32'],
+				'sources' : ['cpp/stack-walker.cpp'],
+				'msvs_settings' : {
+					'VCCLCompilerTool' : {
+						'AdditionalOptions' : [
+							'/GL', '/GF', '/EHsc', '/GS', '/Gy', '/GR-', '/std:c++17',
+						]
+					},
+					'VCLinkerTool' : {
+						'AdditionalOptions' : ['/DEBUG:NONE', '/LTCG'],
 					},
 				},
-			]],
-		},
-	]
+			}],
+		],
+	}],
 }

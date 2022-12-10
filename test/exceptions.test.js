@@ -1,0 +1,44 @@
+'use strict';
+
+const util = require('node:util');
+const exec = util.promisify(require('node:child_process').exec);
+
+const { platform } = require('addon-tools-raub');
+
+
+const runAndGetError = async (name) => {
+	let response = '';
+	try {
+		await exec(`node -e "require('.').${name}()"`);
+	} catch (error) {
+		response = error.message;
+	}
+	return response;
+};
+
+
+describe('Exceptions', () => {
+	it('Reports segfaults', async () => {
+		let response = await runAndGetError('causeSegfault');
+		const exceptionName = platform === 'windows' ? 'ACCESS_VIOLATION' : 'SIGSEGV';
+		expect(response).toContain(exceptionName);
+	});
+	
+	it('Reports division by zero (integer)', async () => {
+		let response = await runAndGetError('causeDivisionInt');
+		const exceptionName = platform === 'windows' ? 'INT_DIVIDE_BY_ZERO' : 'SIGFPE';
+		expect(response).toContain(exceptionName);
+	});
+	
+	it('Reports stack overflow', async () => {
+		let response = await runAndGetError('causeOverflow');
+		const exceptionName = platform === 'windows' ? 'STACK_OVERFLOW' : 'SIGILL';
+		expect(response).toContain(exceptionName);
+	});
+	
+	it('Reports illegal operation', async () => {
+		let response = await runAndGetError('causeIllegal');
+		const exceptionName = platform === 'windows' ? 'ILLEGAL_INSTRUCTION' : 'SIGILL';
+		expect(response).toContain(exceptionName);
+	});
+});

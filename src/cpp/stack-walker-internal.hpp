@@ -78,7 +78,6 @@ public:
 		}
 		
 		return m_hDbhHelp != NULL;
-		
 	}
 	
 	
@@ -142,9 +141,7 @@ public:
 		
 		char buf[STACKWALK_MAX_NAMELEN] = {0};
 		if (this->pSGSP != NULL) {
-			if (
-				this->pSGSP(m_hProcess, buf, STACKWALK_MAX_NAMELEN) == FALSE
-			) {
+			if (this->pSGSP(m_hProcess, buf, STACKWALK_MAX_NAMELEN) == FALSE) {
 				GetLastError();
 			}
 		}
@@ -355,7 +352,6 @@ private:
 		tGMBN *pGMBN,
 		tGMI *pGMI
 	) {
-		
 		*hPsapi = LoadLibrary(_T("psapi.dll"));
 		if (*hPsapi == NULL) {
 			return false;
@@ -378,7 +374,6 @@ private:
 		}
 		
 		return true;
-		
 	}
 	
 	
@@ -410,7 +405,6 @@ private:
 	
 	
 	BOOL GetModuleListPSAPI(HANDLE hProcess) {
-		
 		DWORD i;
 		DWORD cbNeeded;
 		MODULEINFO mi;

@@ -4,9 +4,16 @@
 #include <addon-tools.hpp>
 
 
-JS_METHOD(CauseSegfault);
-
-void RegisterHandler();
+namespace segfault {
+	void init();
+	void registerHandler();
+	
+	JS_METHOD(causeSegfault);
+	JS_METHOD(causeDivisionInt);
+	JS_METHOD(causeOverflow);
+	JS_METHOD(causeIllegal);
+	JS_METHOD(setSignal);
+}
 
 
 #endif /* _SEGFAULT_HANDLER_HPP_ */

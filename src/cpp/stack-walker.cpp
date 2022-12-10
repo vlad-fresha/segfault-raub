@@ -509,7 +509,6 @@ void StackWalker::OnCallstackEntry(CallstackEntryType eType, CallstackEntry *ent
 	CHAR buffer[STACKWALK_MAX_NAMELEN];
 	
 	if ((eType != lastEntry) && (entry->offset != 0)) {
-		
 		if (entry->undFullName[0] != 0) {
 			strcpy_s(entry->name, entry->undFullName);
 		} else if (entry->undName[0] != 0) {

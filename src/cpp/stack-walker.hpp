@@ -6,7 +6,7 @@
 #include <stdlib.h>
 
 
-class StackWalkerInternal;  // forward
+class StackWalkerInternal; // forward
 
 #define STACKWALK_MAX_NAMELEN 1024
 

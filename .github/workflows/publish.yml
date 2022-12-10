@@ -27,7 +27,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 16.17.0
+          node-version: 18.12.1
           cache: 'npm'
 
       - name: Get Npm Version
@@ -46,6 +46,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.package-version.outputs.current-version}}
+          tag_name: ${{ steps.package-version.outputs.current-version }}
           release_name: ${{ github.event.inputs.name }}
           body: ${{ github.event.inputs.text }}
