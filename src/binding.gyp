@@ -19,12 +19,6 @@
 				'defines': ['__linux__'],
 			}],
 			['OS=="mac"', {
-				'libraries': [
-					'-Wl,-rpath,@loader_path',
-					'-Wl,-rpath,@loader_path/../node_modules/deps-opengl-raub/<(bin)',
-					'-Wl,-rpath,@loader_path/../../deps-opengl-raub/<(bin)',
-					'<(gl_bin)/glfw.dylib',
-				],
 				'MACOSX_DEPLOYMENT_TARGET': '10.9',
 				'defines': ['__APPLE__'],
 				'CLANG_CXX_LIBRARY': 'libc++',
