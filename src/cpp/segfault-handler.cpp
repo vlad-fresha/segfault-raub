@@ -23,7 +23,7 @@ namespace segfault {
 
 constexpr int STDERR_FD = 2;
 constexpr size_t BUFF_SIZE = 256;
-constexpr int F_OK = 0;
+constexpr int FILE_STATUS_OK = 0;
 
 #ifdef _WIN32
 	constexpr uint32_t STACK_SIGNAL = EXCEPTION_STACK_OVERFLOW;
@@ -170,9 +170,9 @@ std::map<uint32_t, bool> signalActivity = {
 };
 
 
-bool _isSignalEnabled(uint32_t signal) {
+bool _isSignalEnabled(uint32_t signalId) {
 #ifdef _WIN32
-	return (signalNames.count(signal) && signalActivity.count(signal) && signalActivity[signal]);
+	return (signalNames.count(signalId) && signalActivity.count(signalId) && signalActivity[signalId]);
 #else
 	return true;
 #endif
@@ -191,10 +191,10 @@ std::pair<uint32_t, uint64_t> _getSignalAndAddress(siginfo_t *info) {
 #endif
 
 
-void _writeStackTrace(int fd, uint32_t signal) {
+void _writeStackTrace(int fd, uint32_t signalId) {
 	// generate the stack trace and write to fd and stderr
 #ifdef _WIN32
-	if (EXCEPTION_STACK_OVERFLOW != signal) {
+	if (EXCEPTION_STACK_OVERFLOW != signalId) {
 		StackWalker sw(fd);
 		sw.ShowCallstack();
 	}
@@ -212,7 +212,7 @@ void _writeStackTrace(int fd, uint32_t signal) {
 int _openLogFile() {
 	int fd = 0;
 	
-	if (access("segfault.log", F_OK) == -1) {
+	if (access("segfault.log", FILE_STATUS_OK) == -1) {
 		fprintf(
 			stderr,
 			"SegfaultHandler: The exception won't be logged into a file, unless 'segfault.log' exists.\n"
@@ -235,14 +235,14 @@ void _writeTimeToFile(int fd) {
 	}
 }
 
-void _writeLogHeader(int fd, uint32_t signal, uint64_t address) {
+void _writeLogHeader(int fd, uint32_t signalId, uint64_t address) {
 	int pid = GETPID();
 	int n = SNPRINTF(
 		sbuff,
 		BUFF_SIZE,
 		"\nPID %d received %s for address: 0x%llx\n",
 		pid,
-		signalNames.at(signal).c_str(),
+		signalNames.at(signalId).c_str(),
 		address
 	);
 	
@@ -255,14 +255,14 @@ void _writeLogHeader(int fd, uint32_t signal, uint64_t address) {
 	fprintf(stderr, "%s", sbuff);
 }
 
-void _writeStackNote(int fd, uint32_t signal, uint64_t address) {
+void _writeStackNote(int fd, uint32_t signalId, uint64_t address) {
 	int pid = GETPID();
 	int n = SNPRINTF(
 		sbuff,
 		BUFF_SIZE,
 		"\nPID %d received %s for address: 0x%llx\n",
 		pid,
-		signalNames.at(signal).c_str(),
+		signalNames.at(signalId).c_str(),
 		address
 	);
 	
@@ -285,23 +285,23 @@ void _closeLogFile(int fd) {
 
 SEGFAULT_HANDLER {
 	auto signalAndAdress = _getSignalAndAddress(info);
-	uint32_t signal = signalAndAdress.first;
+	uint32_t signalId = signalAndAdress.first;
 	uint64_t address = signalAndAdress.second;
 	
-	if (!_isSignalEnabled(signal)) {
+	if (!_isSignalEnabled(signalId)) {
 		HANDLER_CANCEL;
 	}
 	
 	int fd = _openLogFile();
 	
-	if (signal != STACK_SIGNAL) {
+	if (signalId != STACK_SIGNAL) {
 		_writeTimeToFile(fd);
 	}
 	
-	_writeLogHeader(fd, signal, address);
+	_writeLogHeader(fd, signalId, address);
 	
-	if (signal != STACK_SIGNAL) {
-		_writeStackTrace(fd, signal);
+	if (signalId != STACK_SIGNAL) {
+		_writeStackTrace(fd, signalId);
 	}
 	
 	_closeLogFile(fd);
@@ -377,42 +377,42 @@ JS_METHOD(causeIllegal) { NAPI_ENV;
 }
 
 
-void _enableSignal(uint32_t signal) {
+void _enableSignal(uint32_t signalId) {
 	#ifndef _WIN32
-		struct sigaction sa;
-		memset(&sa, 0, sizeof(struct sigaction));
-		sigemptyset(&sa.sa_mask);
-		sa.sa_sigaction = handleSegfault;
-		sa.sa_flags = SA_SIGINFO;
-		sigaction(SIGSEGV, &sa, NULL);
+		struct sigaction action;
+		memset(&action, 0, sizeof(struct sigaction));
+		sigemptyset(&action.sa_mask);
+		action.sa_sigaction = handleSegfault;
+		action.sa_flags = SA_SIGINFO;
+		sigaction(signalId, &action, NULL);
 	#endif
 }
 
-void _disableSignal(uint32_t signal) {
+void _disableSignal(uint32_t signalId) {
 	#ifndef _WIN32
-		signal(signal, SIG_DFL);
+		signal(signalId, SIG_DFL);
 	#endif
 }
 
 
 JS_METHOD(setSignal) { NAPI_ENV;
-	REQ_INT32_ARG(0, signal);
+	REQ_INT32_ARG(0, signalId);
 	LET_BOOL_ARG(0, value);
 	
-	if (!signalNames.count(signal)) {
+	if (!signalNames.count(signalId)) {
 		RET_UNDEFINED;
 	}
 	
-	bool wasEnabled = signalActivity[signal];
+	bool wasEnabled = signalActivity[signalId];
 	if (wasEnabled == value) {
 		RET_UNDEFINED;
 	}
 	
-	signalActivity[signal] = value;
+	signalActivity[signalId] = value;
 	if (value) {
-		_enableSignal(signal);
+		_enableSignal(signalId);
 	} else {
-		_disableSignal(signal);
+		_disableSignal(signalId);
 	}
 	
 	RET_UNDEFINED;
