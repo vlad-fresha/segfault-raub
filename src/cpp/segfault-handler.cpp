@@ -1,6 +1,8 @@
 #include <memory>
 #include <map>
 #include <string>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdio.h>
 #include <time.h>
@@ -21,39 +23,29 @@
 
 namespace segfault {
 
-constexpr int STDERR_FD = 2;
-constexpr size_t BUFF_SIZE = 256;
-constexpr int FILE_STATUS_OK = 0;
-
 #ifdef _WIN32
 	constexpr uint32_t STACK_SIGNAL = EXCEPTION_STACK_OVERFLOW;
-	constexpr auto CLOSE = _close;
 	constexpr auto GETPID = _getpid;
-	constexpr auto OPEN = _open;
-	constexpr auto SNPRINTF = _snprintf;
-	constexpr auto WRITE = _write;
-	constexpr int S_FLAGS = _S_IWRITE;
-	constexpr int O_FLAGS = _O_CREAT | _O_APPEND | _O_WRONLY;
-	#define SEGFAULT_HANDLER LONG CALLBACK handleSegfault(PEXCEPTION_POINTERS info)
+	#define SEGFAULT_HANDLER LONG CALLBACK handleSignal(PEXCEPTION_POINTERS info)
 	#define NO_INLINE __declspec(noinline)
 	#define HANDLER_CANCEL return EXCEPTION_CONTINUE_SEARCH
 	#define HANDLER_DONE return EXCEPTION_EXECUTE_HANDLER
 #else
 	constexpr uint32_t STACK_SIGNAL = 0;
-	constexpr auto CLOSE = close;
 	constexpr auto GETPID = getpid;
-	constexpr auto OPEN = open;
-	constexpr auto SNPRINTF = snprintf;
-	constexpr auto WRITE = write;
-	constexpr int S_FLAGS = S_IRUSR | S_IRGRP | S_IROTH;
-	constexpr int O_FLAGS = O_CREAT | O_APPEND | O_WRONLY;
-	#define SEGFAULT_HANDLER static void handleSegfault(int sig, siginfo_t *info, void *unused)
+	#define SEGFAULT_HANDLER static void handleSignal(int sig, siginfo_t *info, void *unused)
 	#define NO_INLINE __attribute__ ((noinline))
 	#define HANDLER_CANCEL return
 	#define HANDLER_DONE return
+	
+	char _altStackBytes[SIGSTKSZ];
+	stack_t _altStack = {
+		_altStackBytes,
+		0,
+		SIGSTKSZ,
+	};
 #endif
 
-char sbuff[BUFF_SIZE];
 time_t timeInfo;
 
 const std::map<uint32_t, std::string> signalNames = {
@@ -189,94 +181,67 @@ std::pair<uint32_t, uint64_t> _getSignalAndAddress(siginfo_t *info) {
 #endif
 
 
-void _writeStackTrace(int fd, uint32_t signalId) {
+void _writeStackTrace(std::ofstream outfile, uint32_t signalId) {
 	// generate the stack trace and write to fd and stderr
 #ifdef _WIN32
 	if (EXCEPTION_STACK_OVERFLOW != signalId) {
-		StackWalker sw(fd);
+		StackWalker sw(outfile);
 		sw.ShowCallstack();
 	}
 #else
 	void *array[32];
 	size_t size = backtrace(array, 32);
+	char **symbols = backtrace_symbols(array, size);
 	if (fd > 0) {
 		backtrace_symbols_fd(array, size, fd);
 	}
+	constexpr int STDERR_FD = 2;
 	backtrace_symbols_fd(array, size, STDERR_FD);
 #endif
 }
 
 
-int _openLogFile() {
-	int fd = 0;
+std::ofstream _openLogFile() {
+	std::ofstream outfile;
 	
-	if (access("segfault.log", FILE_STATUS_OK) == -1) {
-		fprintf(
-			stderr,
-			"SegfaultHandler: The exception won't be logged into a file, unless 'segfault.log' exists.\n"
-		);
-		return fd;
+	if (!std::filesystem::exists("segfault.log")) {
+		std::cerr << "SegfaultHandler: The exception won't be logged into a file, unless 'segfault.log' exists." << std::endl;
+		return outfile;
 	}
 	
-	return OPEN("segfault.log", O_FLAGS, S_FLAGS);
+	outfile.open("segfault.log", std::ofstream::app);
+	return outfile;
 }
 
-void _writeTimeToFile(int fd) {
+void _writeTimeToFile(std::ofstream outfile) {
+	if (!outfile.is_open()) {
+		return;
+	}
+	
 	time(&timeInfo);
-	const char *timeStr = ctime(&timeInfo);
-	int n = SNPRINTF(sbuff, BUFF_SIZE, "\n\nAt %s", timeStr);
 	
-	if (fd > 0) {
-		if (WRITE(fd, sbuff, n) != n) {
-			fprintf(stderr, "SegfaultHandler: Error writing to file.\n");
-		}
+	outfile << "\n\nAt " << ctime(&timeInfo) << std::endl;
+	if (outfile.bad()) {
+		std::cerr << "SegfaultHandler: Error writing to file." << std::endl;
 	}
 }
 
-void _writeLogHeader(int fd, uint32_t signalId, uint64_t address) {
-	int pid = GETPID();
-	int n = SNPRINTF(
-		sbuff,
-		BUFF_SIZE,
-		"\nPID %d received %s for address: 0x%llx\n",
-		pid,
-		signalNames.at(signalId).c_str(),
-		address
-	);
+void _writeLogHeader(std::ofstream outfile, uint32_t signalId, uint64_t address) {
+	std::cerr << "\nPID " << pid << " received " << signalNames.at(signalId) << " for address: " << address << std::endl;
 	
-	if (fd > 0) {
-		if (WRITE(fd, sbuff, n) != n) {
-			fprintf(stderr, "SegfaultHandler: Error writing to file\n");
-		}
+	if (!outfile.is_open()) {
+		return;
 	}
 	
-	fprintf(stderr, "%s", sbuff);
-}
-
-void _writeStackNote(int fd, uint32_t signalId, uint64_t address) {
-	int pid = GETPID();
-	int n = SNPRINTF(
-		sbuff,
-		BUFF_SIZE,
-		"\nPID %d received %s for address: 0x%llx\n",
-		pid,
-		signalNames.at(signalId).c_str(),
-		address
-	);
-	
-	if (fd > 0) {
-		if (WRITE(fd, sbuff, n) != n) {
-			fprintf(stderr, "SegfaultHandler: Error writing to file\n");
-		}
+	outfile << "\nPID " << pid << " received " << signalNames.at(signalId) << " for address: " << address << std::endl;
+	if (outfile.bad()) {
+		std::cerr << "SegfaultHandler: Error writing to file." << std::endl;
 	}
-	
-	fprintf(stderr, "%s", sbuff);
 }
 
-void _closeLogFile(int fd) {
-	fflush(stderr);
-	if (fd) {
-		CLOSE(fd);
+void _closeLogFile(std::ofstream outfile) {
+	if (outfile.is_open()) {
+		outfile.close();
 	}
 }
 
@@ -286,26 +251,23 @@ SEGFAULT_HANDLER {
 	uint32_t signalId = signalAndAdress.first;
 	uint64_t address = signalAndAdress.second;
 	
-	fprintf(stderr, "%d %s\n", signalId, signalNames.at(signalId).c_str());
-	fflush(stderr);
-	
 	if (!_isSignalEnabled(signalId)) {
 		HANDLER_CANCEL;
 	}
 	
-	int fd = _openLogFile();
+	std::ofstream outfile = _openLogFile();
 	
 	if (signalId != STACK_SIGNAL) {
-		_writeTimeToFile(fd);
+		_writeTimeToFile(outfile);
 	}
 	
-	_writeLogHeader(fd, signalId, address);
+	_writeLogHeader(outfile, signalId, address);
 	
 	if (signalId != STACK_SIGNAL) {
-		_writeStackTrace(fd, signalId);
+		_writeStackTrace(outfile, signalId);
 	}
 	
-	_closeLogFile(fd);
+	_closeLogFile(outfile);
 	
 	HANDLER_DONE;
 }
@@ -324,8 +286,7 @@ NO_INLINE void _segfaultStackFrame2(void) {
 
 
 JS_METHOD(causeSegfault) { NAPI_ENV;
-	fprintf(stderr, "SegfaultHandler: about to cause a segfault...\n");
-	fflush(stderr);
+	std::cout << "SegfaultHandler: about to cause a segfault..." << std::endl;
 	void (*fn_ptr)() = _segfaultStackFrame2;
 	fn_ptr();
 	RET_UNDEFINED;
@@ -335,8 +296,7 @@ NO_INLINE void _divideInt() {
 	int a = 1.f;
 	std::vector<int> empty = { 1 };
 	int b = empty[0] - static_cast<int>(empty.size());
-	fprintf(stderr, "SegfaultHandler: about to divide by int 0...\n");
-	fflush(stderr);
+	std::cout << "SegfaultHandler: about to divide by int 0..." << std::endl;
 	int c = a / b; // division by zero
 	empty.push_back(c);
 }
@@ -350,25 +310,23 @@ JS_METHOD(causeDivisionInt) { NAPI_ENV;
 
 NO_INLINE void _overflowStack() {
 	int foo[1000];
-	(void)foo;
-	std::vector<int> empty;
-	if (empty.size()) {
+	foo[999] = 1;
+	std::vector<int> empty = { foo[999] };
+	if (empty.size() != 1) {
 		return;
 	}
 	_overflowStack(); // infinite recursion
 }
 
 JS_METHOD(causeOverflow) { NAPI_ENV;
-	fprintf(stderr, "SegfaultHandler: about to overflow the stack...\n");
-	fflush(stderr);
+	std::cout << "SegfaultHandler: about to overflow the stack..." << std::endl;
 	_overflowStack();
 	RET_UNDEFINED;
 }
 
 
 JS_METHOD(causeIllegal) { NAPI_ENV;
-	fprintf(stderr, "SegfaultHandler: about to raise an illegal operation...\n");
-	fflush(stderr);
+	std::cout << "SegfaultHandler: about to raise an illegal operation..." << std::endl;
 #ifdef _WIN32
 	RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION, 0, 0, nullptr);
 #else
@@ -383,8 +341,14 @@ void _enableSignal(uint32_t signalId) {
 		struct sigaction action;
 		memset(&action, 0, sizeof(struct sigaction));
 		sigemptyset(&action.sa_mask);
-		action.sa_sigaction = handleSegfault;
-		action.sa_flags = SA_SIGINFO;
+		action.sa_sigaction = handleSignal;
+		
+		if (signalId == SIGSEGV) {
+			action.sa_flags = SA_SIGINFO | SA_ONSTACK | SA_RESETHAND;
+		} else {
+			action.sa_flags = SA_SIGINFO;
+		}
+		
 		sigaction(signalId, &action, NULL);
 	#endif
 }
@@ -426,7 +390,9 @@ JS_METHOD(setSignal) { NAPI_ENV;
 
 void init() {
 	#ifdef _WIN32
-		SetUnhandledExceptionFilter(handleSegfault);
+		SetUnhandledExceptionFilter(handleSignal);
+	#else
+		sigaltstack(&_altStack, nullptr);
 	#endif
 	
 	for (auto pair: signalActivity) {

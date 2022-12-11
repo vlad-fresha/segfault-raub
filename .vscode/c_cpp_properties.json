@@ -8,7 +8,7 @@
                 "${LocalAppData}/node-gyp/Cache/18.12.1/include/node",
                 "${LocalAppData}/node-gyp/Cache/16.17.0/include/node"
             ],
-            "defines": ["_DEBUG", "UNICODE", "_UNICODE"],
+            "defines": ["UNICODE", "_UNICODE"],
             "windowsSdkVersion": "10.0.19041.0",
             "cStandard": "c17",
             "cppStandard": "c++17",
