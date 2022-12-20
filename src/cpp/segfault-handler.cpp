@@ -11,7 +11,7 @@
 #ifdef _WIN32
 #include <io.h>
 #include <windows.h>
-#include "stack-walker.hpp"
+#include "stack-windows.hpp"
 #else
 #include <signal.h>
 #include <unistd.h>
@@ -181,22 +181,30 @@ std::pair<uint32_t, uint64_t> _getSignalAndAddress(siginfo_t *info) {
 #endif
 
 
-void _writeStackTrace(std::ofstream outfile, uint32_t signalId) {
-	// generate the stack trace and write to fd and stderr
+	// generate the stack trace and write to outfile (if open)
+void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 #ifdef _WIN32
 	if (EXCEPTION_STACK_OVERFLOW != signalId) {
-		StackWalker sw(outfile);
-		sw.ShowCallstack();
+		showCallstack(outfile);
 	}
 #else
 	void *array[32];
 	size_t size = backtrace(array, 32);
 	char **symbols = backtrace_symbols(array, size);
-	if (fd > 0) {
-		backtrace_symbols_fd(array, size, fd);
+	
+	if (outfile.is_open()) {
+		for (i = 0; i < size; i++) {
+			outfile << symbols[i] << std::endl;
+			if (outfile.bad()) {
+				std::cerr << "SegfaultHandler: Error writing to file." << std::endl;
+				break;
+			}
+		}
 	}
-	constexpr int STDERR_FD = 2;
-	backtrace_symbols_fd(array, size, STDERR_FD);
+	
+	for (i = 0; i < size; i++) {
+		std::cerr << symbols[i] << std::endl;
+	}
 #endif
 }
 
@@ -210,10 +218,11 @@ std::ofstream _openLogFile() {
 	}
 	
 	outfile.open("segfault.log", std::ofstream::app);
+	
 	return outfile;
 }
 
-void _writeTimeToFile(std::ofstream outfile) {
+void _writeTimeToFile(std::ofstream &outfile) {
 	if (!outfile.is_open()) {
 		return;
 	}
@@ -226,7 +235,8 @@ void _writeTimeToFile(std::ofstream outfile) {
 	}
 }
 
-void _writeLogHeader(std::ofstream outfile, uint32_t signalId, uint64_t address) {
+void _writeLogHeader(std::ofstream &outfile, uint32_t signalId, uint64_t address) {
+	int pid = GETPID();
 	std::cerr << "\nPID " << pid << " received " << signalNames.at(signalId) << " for address: " << address << std::endl;
 	
 	if (!outfile.is_open()) {
@@ -239,7 +249,7 @@ void _writeLogHeader(std::ofstream outfile, uint32_t signalId, uint64_t address)
 	}
 }
 
-void _closeLogFile(std::ofstream outfile) {
+void _closeLogFile(std::ofstream &outfile) {
 	if (outfile.is_open()) {
 		outfile.close();
 	}
