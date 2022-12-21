@@ -356,7 +356,7 @@ void _enableSignal(uint32_t signalId) {
 		if (signalId == SIGSEGV) {
 			action.sa_flags = SA_SIGINFO | SA_ONSTACK | SA_RESETHAND;
 		} else {
-			action.sa_flags = SA_SIGINFO;
+			action.sa_flags = SA_SIGINFO | SA_RESETHAND;
 		}
 		
 		sigaction(signalId, &action, NULL);
