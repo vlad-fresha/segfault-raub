@@ -193,7 +193,7 @@ void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 	char **symbols = backtrace_symbols(array, size);
 	
 	if (outfile.is_open()) {
-		for (i = 0; i < size; i++) {
+		for (size_t i = 0; i < size; i++) {
 			outfile << symbols[i] << std::endl;
 			if (outfile.bad()) {
 				std::cerr << "SegfaultHandler: Error writing to file." << std::endl;
@@ -202,7 +202,7 @@ void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 		}
 	}
 	
-	for (i = 0; i < size; i++) {
+	for (size_t i = 0; i < size; i++) {
 		std::cerr << symbols[i] << std::endl;
 	}
 #endif

@@ -976,7 +976,8 @@ inline void buildSymPath(char *szSymPath) {
 }
 
 
-bool loadModules(HANDLE hProcess, DWORD dwProcessId) {
+bool loadModules(HANDLE hProcess) {
+	DWORD dwProcessId = GetCurrentProcessId();
 	// Build the sym-path:
 	char *szSymPath = nullptr;
 	
@@ -1005,32 +1006,18 @@ bool loadModules(HANDLE hProcess, DWORD dwProcessId) {
 	return bRet;
 }
 
-inline bool getValidContext(HANDLE hThread, CONTEXT *dest) {
-	if (hThread == GetCurrentThread()) {
-		memset(dest, 0, sizeof(CONTEXT));
-		dest->ContextFlags = USED_CONTEXT_FLAGS;
-		RtlCaptureContext(dest);
-		return true;
-	}
-	
-	SuspendThread(hThread);
+inline void getValidContext(CONTEXT *dest) {
 	memset(dest, 0, sizeof(CONTEXT));
 	dest->ContextFlags = USED_CONTEXT_FLAGS;
-	if (GetThreadContext(hThread, dest) == FALSE) {
-		ResumeThread(hThread);
-		return false;
-	}
-	
-	return true;
+	RtlCaptureContext(dest);
 }
 
 
 void showCallstack(std::ofstream &outfile) {
-	DWORD dwProcessId = GetCurrentProcessId();
 	HANDLE hProcess = GetCurrentProcess();
 	HANDLE hThread = GetCurrentThread();
 	
-	loadModules(hProcess, dwProcessId);
+	loadModules(hProcess);
 	
 	if (!m_hDbhHelp) {
 		SetLastError(ERROR_DLL_INIT_FAILED);
@@ -1041,9 +1028,7 @@ void showCallstack(std::ofstream &outfile) {
 	s_readMemoryFunction_UserData = nullptr;
 	
 	CONTEXT c;
-	if (!getValidContext(hThread, &c)) {
-		return;
-	}
+	getValidContext(&c);
 	
 	IMAGEHLP_SYMBOL64 *pSym = reinterpret_cast<IMAGEHLP_SYMBOL64*>(
 		malloc(sizeof(IMAGEHLP_SYMBOL64) + STACKWALK_MAX_NAMELEN)
