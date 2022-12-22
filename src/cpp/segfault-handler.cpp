@@ -160,7 +160,7 @@ std::map<uint32_t, bool> signalActivity = {
 };
 
 
-bool _isSignalEnabled(uint32_t signalId) {
+static inline bool _isSignalEnabled(uint32_t signalId) {
 #ifdef _WIN32
 	return (signalNames.count(signalId) && signalActivity.count(signalId) && signalActivity[signalId]);
 #else
@@ -170,12 +170,12 @@ bool _isSignalEnabled(uint32_t signalId) {
 
 
 #ifdef _WIN32
-std::pair<uint32_t, uint64_t> _getSignalAndAddress(PEXCEPTION_POINTERS info) {
+static inline std::pair<uint32_t, uint64_t> _getSignalAndAddress(PEXCEPTION_POINTERS info) {
 	auto r = info->ExceptionRecord;
 	return { static_cast<uint32_t>(r->ExceptionCode), reinterpret_cast<uint64_t>(r->ExceptionAddress) };
 }
 #else
-std::pair<uint32_t, uint64_t> _getSignalAndAddress(siginfo_t *info) {
+static inline std::pair<uint32_t, uint64_t> _getSignalAndAddress(siginfo_t *info) {
 	return { static_cast<uint32_t>(info->si_signo), reinterpret_cast<uint64_t>(info->si_addr) };
 }
 #endif
@@ -235,7 +235,7 @@ void _writeTimeToFile(std::ofstream &outfile) {
 	}
 }
 
-void _writeLogHeader(std::ofstream &outfile, uint32_t signalId, uint64_t address) {
+static inline void _writeLogHeader(std::ofstream &outfile, uint32_t signalId, uint64_t address) {
 	int pid = GETPID();
 	std::cerr << "\nPID " << pid << " received " << signalNames.at(signalId) << " for address: " << address << std::endl;
 	
@@ -263,6 +263,11 @@ SEGFAULT_HANDLER {
 	
 	if (!_isSignalEnabled(signalId)) {
 		HANDLER_CANCEL;
+	}
+	
+	if (EXCEPTION_STACK_OVERFLOW == signalId) {
+		std::cerr << "\nReceived EXCEPTION_STACK_OVERFLOW. Can't log further." << std::endl;
+		HANDLER_DONE;
 	}
 	
 	std::ofstream outfile = _openLogFile();
