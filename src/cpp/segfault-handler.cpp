@@ -24,14 +24,12 @@
 namespace segfault {
 
 #ifdef _WIN32
-	constexpr uint32_t STACK_SIGNAL = EXCEPTION_STACK_OVERFLOW;
 	constexpr auto GETPID = _getpid;
 	#define SEGFAULT_HANDLER LONG CALLBACK handleSignal(PEXCEPTION_POINTERS info)
 	#define NO_INLINE __declspec(noinline)
 	#define HANDLER_CANCEL return EXCEPTION_CONTINUE_SEARCH
 	#define HANDLER_DONE return EXCEPTION_EXECUTE_HANDLER
 #else
-	constexpr uint32_t STACK_SIGNAL = 0;
 	constexpr auto GETPID = getpid;
 	#define SEGFAULT_HANDLER static void handleSignal(int sig, siginfo_t *info, void *unused)
 	#define NO_INLINE __attribute__ ((noinline))
@@ -265,22 +263,18 @@ SEGFAULT_HANDLER {
 		HANDLER_CANCEL;
 	}
 	
+#ifdef _WIN32
 	if (EXCEPTION_STACK_OVERFLOW == signalId) {
 		std::cerr << "\nReceived EXCEPTION_STACK_OVERFLOW. Can't log further." << std::endl;
 		HANDLER_DONE;
 	}
+#endif
 	
 	std::ofstream outfile = _openLogFile();
 	
-	if (signalId != STACK_SIGNAL) {
-		_writeTimeToFile(outfile);
-	}
-	
+	_writeTimeToFile(outfile);
 	_writeLogHeader(outfile, signalId, address);
-	
-	if (signalId != STACK_SIGNAL) {
-		_writeStackTrace(outfile, signalId);
-	}
+	_writeStackTrace(outfile, signalId);
 	
 	_closeLogFile(outfile);
 	
