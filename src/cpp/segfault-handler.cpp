@@ -179,12 +179,10 @@ static inline std::pair<uint32_t, uint64_t> _getSignalAndAddress(siginfo_t *info
 #endif
 
 
-	// generate the stack trace and write to outfile (if open)
+// Write stack trace to outfile and cerr
 void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 #ifdef _WIN32
-	if (EXCEPTION_STACK_OVERFLOW != signalId) {
-		showCallstack(outfile);
-	}
+	showCallstack(outfile);
 #else
 	void *array[32];
 	size_t size = backtrace(array, 32);
@@ -262,13 +260,6 @@ SEGFAULT_HANDLER {
 	if (!_isSignalEnabled(signalId)) {
 		HANDLER_CANCEL;
 	}
-	
-#ifdef _WIN32
-	if (EXCEPTION_STACK_OVERFLOW == signalId) {
-		std::cerr << "\nReceived EXCEPTION_STACK_OVERFLOW. Can't log further." << std::endl;
-		HANDLER_DONE;
-	}
-#endif
 	
 	std::ofstream outfile = _openLogFile();
 	
@@ -400,6 +391,9 @@ JS_METHOD(setSignal) { NAPI_ENV;
 void init() {
 	#ifdef _WIN32
 		SetUnhandledExceptionFilter(handleSignal);
+		ULONG size = 32 * 1024;
+		SetThreadStackGuarantee(&size);
+		std::cout << "size " << size << " " << GetLastError() << std::endl;
 	#else
 		sigaltstack(&_altStack, nullptr);
 	#endif
