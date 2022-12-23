@@ -225,7 +225,7 @@ void _writeTimeToFile(std::ofstream &outfile) {
 	
 	time(&timeInfo);
 	
-	outfile << "\n\nAt " << ctime(&timeInfo) << std::endl;
+	outfile << "\n\nAt " << ctime(&timeInfo) << std::endl; // NOLINT
 	if (outfile.bad()) {
 		std::cerr << "SegfaultHandler: Error writing to file." << std::endl;
 	}

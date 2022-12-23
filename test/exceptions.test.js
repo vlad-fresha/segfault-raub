@@ -33,7 +33,6 @@ describe('Exceptions', () => {
 	
 	it('Reports stack overflow', async () => {
 		let response = await runAndGetError('causeOverflow');
-		console.log('\n\n\n', response, '\n\n\n');
 		const exceptionName = platform === 'windows' ? 'STACK_OVERFLOW' : 'SIGSEGV';
 		expect(response).toContain(exceptionName);
 	});

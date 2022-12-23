@@ -1,11 +1,11 @@
-#pragma comment(lib, "version.lib") // for "VerQueryValue"
-
 #include <tchar.h>
 #include <iostream>
 #include <windows.h>
 #include <dbghelp.h>
 
 #include "stack-windows.hpp"
+
+#pragma comment(lib, "version.lib") // for "VerQueryValue"
 
 
 constexpr int TTBUFLEN = 8096;
@@ -378,7 +378,7 @@ bool loadPsapi(
 	tGMBN *pGMBN,
 	tGMI *pGMI
 ) {
-	*hPsapi = LoadLibrary(_T("psapi.dll"));
+	*hPsapi = LoadLibrary(_T("psapi.dll")); // NOLINT
 	if (!*hPsapi) {
 		return false;
 	}
@@ -508,7 +508,7 @@ bool GetModuleListTH32(HANDLE hProcess, DWORD pid) {
 	size_t i;
 	
 	for (i = 0; i < (sizeof(dllname) / sizeof(dllname[0])); i++) {
-		hToolhelp = LoadLibrary(dllname[i]);
+		hToolhelp = LoadLibrary(dllname[i]); // NOLINT
 		if (!hToolhelp) {
 			continue;
 		}
@@ -583,7 +583,7 @@ bool loadDbgHelpDll() {
 				_tcscat_s(szTemp, _T("\\Debugging Tools for Windows\\dbghelp.dll"));
 				// now check if the file exists:
 				if (GetFileAttributes(szTemp) != INVALID_FILE_ATTRIBUTES) {
-					m_hDbhHelp = LoadLibrary(szTemp);
+					m_hDbhHelp = LoadLibrary(szTemp); // NOLINT
 				}
 			}
 				// Still not found? Then try to load the 64-Bit version:
@@ -593,7 +593,7 @@ bool loadDbgHelpDll() {
 			) {
 				_tcscat_s(szTemp, _T("\\Debugging Tools for Windows 64-Bit\\dbghelp.dll"));
 				if (GetFileAttributes(szTemp) != INVALID_FILE_ATTRIBUTES) {
-					m_hDbhHelp = LoadLibrary(szTemp);
+					m_hDbhHelp = LoadLibrary(szTemp); // NOLINT
 				}
 			}
 		}
@@ -601,7 +601,7 @@ bool loadDbgHelpDll() {
 	
 	// if not already loaded, try to load a default-one
 	if (!m_hDbhHelp) {
-		m_hDbhHelp = LoadLibrary(_T("dbghelp.dll"));
+		m_hDbhHelp = LoadLibrary(_T("dbghelp.dll")); // NOLINT
 	}
 	
 	return m_hDbhHelp != nullptr;
