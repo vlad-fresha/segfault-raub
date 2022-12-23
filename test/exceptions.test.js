@@ -6,6 +6,8 @@ const exec = util.promisify(require('node:child_process').exec);
 const { platform } = require('addon-tools-raub');
 
 
+jest.setTimeout(30000);
+
 const runAndGetError = async (name) => {
 	let response = '';
 	try {
@@ -17,7 +19,6 @@ const runAndGetError = async (name) => {
 	return response;
 };
 
-
 describe('Exceptions', () => {
 	it('Reports segfaults', async () => {
 		let response = await runAndGetError('causeSegfault');
@@ -28,12 +29,14 @@ describe('Exceptions', () => {
 	it('Reports division by zero (integer)', async () => {
 		let response = await runAndGetError('causeDivisionInt');
 		const exceptionName = platform === 'windows' ? 'INT_DIVIDE_BY_ZERO' : 'SIGILL';
+		console.log('RESPONSE `', response, '`');
 		expect(response).toContain(exceptionName);
 	});
 	
 	it('Reports stack overflow', async () => {
 		let response = await runAndGetError('causeOverflow');
 		const exceptionName = platform === 'windows' ? 'STACK_OVERFLOW' : 'SIGSEGV';
+		console.log('RESPONSE `', response, '`');
 		expect(response).toContain(exceptionName);
 	});
 	
