@@ -276,7 +276,7 @@ SEGFAULT_HANDLER {
 // create some stack frames to inspect from CauseSegfault
 NO_INLINE void _segfaultStackFrame1() {
 	int *foo = reinterpret_cast<int*>(1);
-	*foo = 78; // triggers a segfault exception
+	*foo = 42; // triggers a segfault exception
 }
 
 NO_INLINE void _segfaultStackFrame2(void) {
@@ -293,12 +293,9 @@ JS_METHOD(causeSegfault) { NAPI_ENV;
 }
 
 NO_INLINE void _divideInt() {
-	int a = 1.f;
-	std::vector<int> empty = { 1 };
-	int b = empty[0] - static_cast<int>(empty.size());
-	std::cout << "SegfaultHandler: about to divide by int 0..." << std::endl;
-	int c = a / b; // division by zero
-	empty.push_back(c);
+	volatile int a = 42;
+	volatile int b = 0;
+	a /= b;
 }
 
 

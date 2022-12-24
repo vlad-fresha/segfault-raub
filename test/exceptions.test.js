@@ -25,7 +25,7 @@ describe('Exceptions', () => {
 	});
 	
 	// On OSX (GH Actions) these don't work for some reason
-	if (platform !== 'osx') {
+	if (platform !== 'osx' && platform !== 'aarch64') {
 		it('Reports division by zero (integer)', async () => {
 			let response = await runAndGetError('causeDivisionInt');
 			const exceptionName = platform === 'windows' ? 'INT_DIVIDE_BY_ZERO' : 'SIGILL';
