@@ -18,7 +18,7 @@
 			['OS=="linux"', {
 				'defines': ['__linux__'],
 				'conditions': [
-					['<(arch)=="arm64"', {
+					['"<(arch)"=="arm64"', {
 						'cflags_cc': ['-lstdc++fs'],
 					}],
 				],
