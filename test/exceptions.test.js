@@ -26,19 +26,21 @@ describe('Exceptions', () => {
 		expect(response).toContain(exceptionName);
 	});
 	
-	it('Reports division by zero (integer)', async () => {
-		let response = await runAndGetError('causeDivisionInt');
-		const exceptionName = platform === 'windows' ? 'INT_DIVIDE_BY_ZERO' : 'SIGILL';
-		console.log('RESPONSE `', response, '`');
-		expect(response).toContain(exceptionName);
-	});
-	
-	it('Reports stack overflow', async () => {
-		let response = await runAndGetError('causeOverflow');
-		const exceptionName = platform === 'windows' ? 'STACK_OVERFLOW' : 'SIGSEGV';
-		console.log('RESPONSE `', response, '`');
-		expect(response).toContain(exceptionName);
-	});
+	if (platform !== 'osx') {
+		it('Reports division by zero (integer)', async () => {
+			let response = await runAndGetError('causeDivisionInt');
+			const exceptionName = platform === 'windows' ? 'INT_DIVIDE_BY_ZERO' : 'SIGILL';
+			console.log('RESPONSE `', response, '`');
+			expect(response).toContain(exceptionName);
+		});
+		
+		it('Reports stack overflow', async () => {
+			let response = await runAndGetError('causeOverflow');
+			const exceptionName = platform === 'windows' ? 'STACK_OVERFLOW' : 'SIGSEGV';
+			console.log('RESPONSE `', response, '`');
+			expect(response).toContain(exceptionName);
+		});
+	}
 	
 	it('Reports illegal operation', async () => {
 		let response = await runAndGetError('causeIllegal');
