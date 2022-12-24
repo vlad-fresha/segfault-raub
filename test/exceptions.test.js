@@ -24,7 +24,9 @@ describe('Exceptions', () => {
 		expect(response).toContain(exceptionName);
 	});
 	
-	console.log('PLATFORM', platform);
+	const platformAndArch = `${process.platform}-${process.arch}`;
+	console.log('PLATFORM', platformAndArch);
+	
 	// These don't work properly on ARM
 	if (!['osx', 'aarch64'].includes(platform)) {
 		it('Reports division by zero (integer)', async () => {
