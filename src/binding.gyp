@@ -19,7 +19,7 @@
 				'defines': ['__linux__'],
 				'conditions': [
 					['"<(arch)"=="arm64"', {
-						'cflags_cc': ['-lstdc++fs'],
+						'libraries': ['-lstdc++fs'],
 					}],
 				],
 			}],
