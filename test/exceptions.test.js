@@ -6,8 +6,6 @@ const exec = util.promisify(require('node:child_process').exec);
 const { platform } = require('addon-tools-raub');
 
 
-jest.setTimeout(30000);
-
 const runAndGetError = async (name) => {
 	let response = '';
 	try {
@@ -26,6 +24,7 @@ describe('Exceptions', () => {
 		expect(response).toContain(exceptionName);
 	});
 	
+	// On OSX (GH Actions) these don't work for some reason
 	if (platform !== 'osx') {
 		it('Reports division by zero (integer)', async () => {
 			let response = await runAndGetError('causeDivisionInt');
