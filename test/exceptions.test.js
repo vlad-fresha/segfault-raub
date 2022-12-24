@@ -28,7 +28,7 @@ describe('Exceptions', () => {
 	if (platform !== 'osx' && platform !== 'aarch64') {
 		it('Reports division by zero (integer)', async () => {
 			let response = await runAndGetError('causeDivisionInt');
-			const exceptionName = platform === 'windows' ? 'INT_DIVIDE_BY_ZERO' : 'SIGILL';
+			const exceptionName = platform === 'windows' ? 'INT_DIVIDE_BY_ZERO' : 'SIGFPE';
 			console.log('RESPONSE `', response, '`');
 			expect(response).toContain(exceptionName);
 		});
