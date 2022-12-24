@@ -24,27 +24,22 @@ describe('Exceptions', () => {
 		expect(response).toContain(exceptionName);
 	});
 	
-	const platformAndArch = `${process.platform}-${process.arch}`;
-	console.log('PLATFORM', platformAndArch);
-	
 	// These don't work properly on ARM
-	if (!['osx', 'aarch64'].includes(platform)) {
-		it('Reports division by zero (integer)', async () => {
+	if (['windows', 'linux'].includes(platform)) {
+		it('Reports divisions by zero (int)', async () => {
 			let response = await runAndGetError('causeDivisionInt');
 			const exceptionName = platform === 'windows' ? 'INT_DIVIDE_BY_ZERO' : 'SIGFPE';
-			console.log('RESPONSE `', response, '`');
 			expect(response).toContain(exceptionName);
 		});
 		
-		it('Reports stack overflow', async () => {
+		it('Reports stack overflows', async () => {
 			let response = await runAndGetError('causeOverflow');
 			const exceptionName = platform === 'windows' ? 'STACK_OVERFLOW' : 'SIGSEGV';
-			console.log('RESPONSE `', response, '`');
 			expect(response).toContain(exceptionName);
 		});
 	}
 	
-	it('Reports illegal operation', async () => {
+	it('Reports illegal operations', async () => {
 		let response = await runAndGetError('causeIllegal');
 		const exceptionName = platform === 'windows' ? 'ILLEGAL_INSTRUCTION' : 'SIGILL';
 		expect(response).toContain(exceptionName);
