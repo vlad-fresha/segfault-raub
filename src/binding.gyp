@@ -1,6 +1,6 @@
 {
 	'variables': {
-		'bin': '<!(node -p "require(\'addon-tools-raub\').bin")',
+		'arch': '<!(node -p "process.arch")',
 	},
 	'targets': [{
 		'target_name': 'segfault',
@@ -12,25 +12,30 @@
 			'<!@(node -p "require(\'addon-tools-raub\').include")',
 		],
 		'defines': ['UNICODE', '_UNICODE'],
-		'cflags_cc': ['-std=c++17'],
-		'cflags': ['-O0', '-funwind-tables'],
+		'cflags_cc': ['-std=c++17', '-fno-exceptions'],
+		'cflags': ['-O0', '-funwind-tables', '-fno-exceptions'],
 		'conditions': [
 			['OS=="linux"', {
 				'defines': ['__linux__'],
+				'conditions': [
+					['<(arch)=="arm64"', {
+						'cflags_cc': ['-lstdc++fs'],
+					}],
+				],
 			}],
 			['OS=="mac"', {
 				'MACOSX_DEPLOYMENT_TARGET': '10.9',
 				'defines': ['__APPLE__'],
 				'CLANG_CXX_LIBRARY': 'libc++',
-				'OTHER_CFLAGS': ['-std=c++17', '-O0', '-funwind-tables'],
+				'OTHER_CFLAGS': ['-std=c++17', '-O0', '-funwind-tables', '-fno-exceptions'],
 			}],
 			['OS=="win"', {
-				'defines' : ['WIN32_LEAN_AND_MEAN', 'VC_EXTRALEAN', '_WIN32'],
+				'defines' : ['WIN32_LEAN_AND_MEAN', 'VC_EXTRALEAN', '_WIN32', '_HAS_EXCEPTIONS=0'],
 				'sources' : ['cpp/stack-windows.cpp'],
 				'msvs_settings' : {
 					'VCCLCompilerTool' : {
 						'AdditionalOptions' : [
-							'/GL', '/GF', '/EHsc', '/GS', '/Gy', '/GR-', '/std:c++17',
+							'/GL', '/GF', '/EHa-s-c-r-', '/GS', '/Gy', '/GR-', '/std:c++17',
 						]
 					},
 					'VCLinkerTool' : {
