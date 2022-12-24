@@ -24,8 +24,9 @@ describe('Exceptions', () => {
 		expect(response).toContain(exceptionName);
 	});
 	
-	// On OSX (GH Actions) these don't work for some reason
-	if (platform !== 'osx' && platform !== 'aarch64') {
+	console.log('PLATFORM', platform);
+	// These don't work properly on ARM
+	if (!['osx', 'aarch64'].includes(platform)) {
 		it('Reports division by zero (integer)', async () => {
 			let response = await runAndGetError('causeDivisionInt');
 			const exceptionName = platform === 'windows' ? 'INT_DIVIDE_BY_ZERO' : 'SIGFPE';
