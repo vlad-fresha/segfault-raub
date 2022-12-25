@@ -1,5 +1,8 @@
 #include <tchar.h>
 #include <iostream>
+#include <sstream>
+#include <vector>
+#include <string>
 #include <windows.h>
 #include <dbghelp.h>
 
@@ -8,7 +11,9 @@
 #pragma comment(lib, "version.lib") // for "VerQueryValue"
 
 
-constexpr int TTBUFLEN = 8096;
+constexpr int NAME_BUF_SIZE = 8096;
+constexpr int DEFAULT_MODULE_COUNT = 1024;
+constexpr int DEFAULT_MODULE_BUF_SIZE = DEFAULT_MODULE_COUNT * sizeof(HMODULE);
 constexpr int STACKWALK_MAX_NAMELEN = 1024;
 constexpr int MAX_MODULE_NAME32 = 255;
 constexpr int TH32CS_SNAPMODULE = 0x00000008;
@@ -17,6 +22,14 @@ constexpr size_t nSymPathLen = 4096;
 // Normally it should be enough to use 'CONTEXT_FULL' (better would be 'CONTEXT_ALL')
 constexpr int USED_CONTEXT_FLAGS = CONTEXT_FULL;
 
+
+typedef std::unique_ptr<std::remove_pointer_t<HMODULE>, decltype(&::FreeLibrary)> PtrModule;
+
+struct IMAGEHLP_SYMBOL64_NAMED : IMAGEHLP_SYMBOL64 {
+	char name[NAME_BUF_SIZE];
+};
+typedef std::unique_ptr<IMAGEHLP_SYMBOL64_NAMED> PtrSymbol;
+typedef std::unique_ptr<char[]> PtrChars;
 
 struct IMAGEHLP_MODULE64_V2 {
 	DWORD    SizeOfStruct;           // set to sizeof(IMAGEHLP_MODULE64)
@@ -60,13 +73,13 @@ typedef BOOL (__stdcall *tSGSFA)(
 
 // SymInitialize()
 typedef BOOL (__stdcall *tSI)(
-	IN HANDLE hProcess, IN PSTR UserSearchPath, IN BOOL fInvadeProcess
+	IN HANDLE hProcess, IN PCSTR UserSearchPath, IN BOOL fInvadeProcess
 );
 
 // SymLoadModule64()
 typedef DWORD64 (__stdcall *tSLM)(
 	IN HANDLE hProcess, IN HANDLE hFile,
-	IN PSTR ImageName, IN PSTR ModuleName, IN DWORD64 BaseOfDll, IN DWORD SizeOfDll
+	IN PCSTR ImageName, IN PCSTR ModuleName, IN DWORD64 BaseOfDll, IN DWORD SizeOfDll
 );
 
 // SymSetOptions()
@@ -87,9 +100,10 @@ typedef BOOL (__stdcall *tSW)(
 
 // UnDecorateSymbolName()
 typedef DWORD (__stdcall WINAPI *tUDSN)(
-	PCSTR DecoratedName, PSTR UnDecoratedName, DWORD UndecoratedLength, DWORD Flags
+	PCSTR name, PSTR outputString, DWORD maxStringLength, DWORD flags
 );
 
+// SymGetSearchPath
 typedef BOOL (__stdcall WINAPI *tSGSP)(
 	HANDLE hProcess, PSTR SearchPath, DWORD SearchPathLength
 );
@@ -110,6 +124,13 @@ typedef struct tagMODULEENTRY32 {
 typedef MODULEENTRY32* PMODULEENTRY32;
 typedef MODULEENTRY32* LPMODULEENTRY32;
 #pragma pack(pop)
+
+// CreateToolhelp32Snapshot()
+typedef HANDLE (__stdcall *tCT32S)(DWORD dwFlags, DWORD th32ProcessID);
+// Module32First()
+typedef BOOL (__stdcall *tM32F)(HANDLE hSnapshot, LPMODULEENTRY32 lpme);
+// Module32Next()
+typedef BOOL (__stdcall *tM32N)(HANDLE hSnapshot, LPMODULEENTRY32 lpme);
 
 typedef struct _MODULEINFO {
 	LPVOID lpBaseOfDll;
@@ -170,13 +191,6 @@ enum CallstackEntryType {
 };
 
 
-// The following is used to pass the "userData"-Pointer to the user-provided readMemoryFunction
-// This has to be done due to a problem with the "hProcess"-parameter in x64...
-// Because this class is in no case multi-threading-enabled (because of the limitations
-// of dbghelp.dll) it is "safe" to use a static-variable
-PReadProcessMemoryRoutine s_readMemoryFunction = nullptr;
-LPVOID s_readMemoryFunction_UserData = nullptr;
-
 tSC pSC = nullptr;
 tSFTA pSFTA = nullptr;
 tSGLFA pSGLFA = nullptr;
@@ -192,6 +206,11 @@ tUDSN pUDSN = nullptr;
 tSGSP pSGSP = nullptr;
 
 HMODULE m_hDbhHelp = nullptr;
+
+PtrModule makePtrModule(const wchar_t *name) {
+	PtrModule ptrModule(LoadLibrary(name), FreeLibrary);
+	return ptrModule;
+}
 
 
 bool GetModuleInfo(HANDLE hProcess, DWORD64 baseAddr, IMAGEHLP_MODULE64_V2 *pModuleInfo) {
@@ -222,39 +241,6 @@ bool GetModuleInfo(HANDLE hProcess, DWORD64 baseAddr, IMAGEHLP_MODULE64_V2 *pMod
 	free(pData);
 	SetLastError(ERROR_DLL_INIT_FAILED);
 	return false;
-}
-
-void OnLoadModule(
-	LPCSTR img,
-	LPCSTR mod,
-	DWORD64 baseAddr,
-	DWORD size,
-	DWORD result,
-	LPCSTR symType,
-	LPCSTR pdbName,
-	uint64_t fileVersion
-) {
-	char buffer[STACKWALK_MAX_NAMELEN];
-	if (!fileVersion) {
-		_snprintf_s(
-			buffer,
-			STACKWALK_MAX_NAMELEN,
-			"%s:%s (%p), size: %d (result: %d), SymType: '%s', PDB: '%s'\n",
-			img, mod, (LPVOID) baseAddr, size, result, symType, pdbName
-		);
-		return;
-	}
-	
-	DWORD v4 = (DWORD) fileVersion & 0xFFFF;
-	DWORD v3 = (DWORD) (fileVersion>>16) & 0xFFFF;
-	DWORD v2 = (DWORD) (fileVersion>>32) & 0xFFFF;
-	DWORD v1 = (DWORD) (fileVersion>>48) & 0xFFFF;
-	_snprintf_s(
-		buffer,
-		STACKWALK_MAX_NAMELEN,
-		"%s:%s (%p), size: %d (result: %d), SymType: '%s', PDB: '%s', fileVersion: %d.%d.%d.%d\n",
-		img, mod, (LPVOID) baseAddr, size, result, symType, pdbName, v1, v2, v3, v4
-	);
 }
 
 
@@ -296,7 +282,7 @@ uint64_t getFileVersion(char *szImg) {
 }
 
 
-inline void setSymType(SYM_TYPE SymType, const char **szSymType) {
+static inline void setSymType(SYM_TYPE SymType, const char **szSymType) {
 	switch(SymType) {
 		case SymNone:
 			*szSymType = "-nosymbols-";
@@ -356,10 +342,6 @@ DWORD LoadModule(
 		if (GetModuleInfo(hProcess, baseAddr, &Module)) {
 			setSymType(Module.SymType, &szSymType);
 		}
-		OnLoadModule(
-			img, mod, baseAddr, size,
-			result, szSymType, Module.LoadedImageName, fileVersion
-		);
 	}
 	if (szImg) {
 		free(szImg);
@@ -371,105 +353,95 @@ DWORD LoadModule(
 }
 
 
-bool loadPsapi(
-	HINSTANCE *hPsapi,
-	tEPM *pEPM,
-	tGMFNE *pGMFNE,
-	tGMBN *pGMBN,
-	tGMI *pGMI
+static inline bool loadPsapi(
+	PtrModule &ptrPsapi,
+	tEPM *pEnumProcessModules,
+	tGMFNE *pGetModuleFileNameExA,
+	tGMBN *pGetModuleBaseNameA,
+	tGMI *pGetModuleInformation
 ) {
-	*hPsapi = LoadLibrary(_T("psapi.dll")); // NOLINT
-	if (!*hPsapi) {
-		return false;
-	}
-	
-	*pEPM = reinterpret_cast<tEPM>(GetProcAddress(*hPsapi, "EnumProcessModules"));
-	*pGMFNE = reinterpret_cast<tGMFNE>(GetProcAddress(*hPsapi, "GetModuleFileNameExA"));
-	*pGMBN = reinterpret_cast<tGMFNE>(GetProcAddress(*hPsapi, "GetModuleBaseNameA"));
-	*pGMI = reinterpret_cast<tGMI>(GetProcAddress(*hPsapi, "GetModuleInformation"));
-	
-	if (!*pEPM || !*pGMFNE || !*pGMBN || !*pGMI) {
-		// we couldn't find all functions
-		FreeLibrary(*hPsapi);
-		return false;
-	}
-	
-	return true;
-}
-
-
-bool allocMods(HMODULE **hMods, char **tt, char **tt2) {
-	*hMods = reinterpret_cast<HMODULE*>(
-		malloc(sizeof(HMODULE) * (TTBUFLEN / sizeof HMODULE))
+	*pEnumProcessModules = reinterpret_cast<tEPM>(
+		GetProcAddress(ptrPsapi.get(), "pEnumProcessModules")
 	);
-	*tt = reinterpret_cast<char*>(
-		malloc(sizeof(char) * TTBUFLEN)
+	*pGetModuleFileNameExA = reinterpret_cast<tGMFNE>(
+		GetProcAddress(ptrPsapi.get(), "GetModuleFileNameExA")
 	);
-	*tt2 = reinterpret_cast<char*>(
-		malloc(sizeof(char) * TTBUFLEN)
+	*pGetModuleBaseNameA = reinterpret_cast<tGMFNE>(
+		GetProcAddress(ptrPsapi.get(), "GetModuleBaseNameA")
 	);
-	return *hMods && *tt && *tt2;
-}
-
-
-void freeMods(HMODULE *hMods, char *tt, char *tt2) {
-	if (tt2) {
-		free(tt2);
-	}
-	if (tt) {
-		free(tt);
-	}
-	if (hMods) {
-		free(hMods);
-	}
+	*pGetModuleInformation = reinterpret_cast<tGMI>(
+		GetProcAddress(ptrPsapi.get(), "GetModuleInformation")
+	);
+	
+	return (
+		*pEnumProcessModules && *pGetModuleFileNameExA && *pGetModuleBaseNameA && *pGetModuleInformation
+	);
 }
 
 
 bool GetModuleListPSAPI(HANDLE hProcess) {
-	DWORD i;
-	DWORD cbNeeded;
-	MODULEINFO mi;
+	tEPM pEnumProcessModules;
+	tGMFNE pGetModuleFileNameExA;
+	tGMBN pGetModuleBaseNameA;
+	tGMI pGetModuleInformation;
 	
-	HINSTANCE hPsapi;
-	tEPM pEPM;
-	tGMFNE pGMFNE;
-	tGMBN pGMBN;
-	tGMI pGMI;
-	if (!loadPsapi(&hPsapi, &pEPM, &pGMFNE, &pGMBN, &pGMI)) {
+	PtrModule ptrPsapi = makePtrModule(L"psapi.dll");
+	if (!ptrPsapi.get() || !loadPsapi(ptrPsapi, &pEnumProcessModules, &pGetModuleFileNameExA, &pGetModuleBaseNameA, &pGetModuleInformation)) {
 		return false;
 	}
 	
 	int cnt = 0;
 	
-	HMODULE *hMods;
-	char *tt;
-	char *tt2;
-	if (!allocMods(&hMods, &tt, &tt2)) {
-		goto cleanup;
+	std::unique_ptr<HMODULE[]> ptrModules(new (std::nothrow) HMODULE[DEFAULT_MODULE_COUNT]);
+	if (!ptrModules.get()) {
+		return false;
 	}
 	
-	if (!pEPM(hProcess, hMods, TTBUFLEN, &cbNeeded)) {
-		//_ftprintf(fLogFile, _T("%lu: EPM failed, GetLastError = %lu\n"), g_dwShowCount, gle);
-		goto cleanup;
+	DWORD cbNeeded;
+	if (!pEnumProcessModules(hProcess, ptrModules.get(), DEFAULT_MODULE_BUF_SIZE, &cbNeeded)) {
+		return false;
 	}
 	
-	if (cbNeeded > TTBUFLEN) {
-		//_ftprintf(fLogFile, _T("%lu: More than %lu module handles. Huh?\n"), g_dwShowCount, lenof(hMods));
-		goto cleanup;
+	if (cbNeeded > DEFAULT_MODULE_BUF_SIZE) {
+		ptrModules.reset(new (std::nothrow) HMODULE[cbNeeded / sizeof(HMODULE)]);
+		if (!ptrModules.get()) {
+			return false;
+		}
+		if (!pEnumProcessModules(hProcess, ptrModules.get(), cbNeeded, &cbNeeded)) {
+			return false;
+		}
 	}
 	
-	for (i = 0; i < cbNeeded / sizeof hMods[0]; i++) {
+	if (!cbNeeded) {
+		return false;
+	}
+	
+	int countModulesFinal = cbNeeded / sizeof(HMODULE);
+	
+	PtrChars ptrFileName(new (std::nothrow) char[NAME_BUF_SIZE]);
+	PtrChars ptrBaseName(new (std::nothrow) char[NAME_BUF_SIZE]);
+	
+	if (!ptrFileName.get() || !ptrBaseName.get()) {
+		return false;
+	}
+	
+	MODULEINFO mi;
+	for (int i = 0; i < countModulesFinal; i++) {
 		// base address, size
-		pGMI(hProcess, hMods[i], &mi, sizeof mi);
+		pGetModuleInformation(hProcess, ptrModules[i], &mi, sizeof mi);
 		// image file name
-		tt[0] = 0;
-		pGMFNE(hProcess, hMods[i], tt, TTBUFLEN);
+		ptrModules[0] = 0;
+		pGetModuleFileNameExA(hProcess, ptrModules[i], ptrFileName.get(), NAME_BUF_SIZE);
 		// module name
-		tt2[0] = 0;
-		pGMBN(hProcess, hMods[i], tt2, TTBUFLEN);
+		ptrModules[0] = 0;
+		pGetModuleBaseNameA(hProcess, ptrModules[i], ptrBaseName.get(), NAME_BUF_SIZE);
 		
 		DWORD dwRes = LoadModule(
-			hProcess, tt, tt2, (DWORD64) mi.lpBaseOfDll, mi.SizeOfImage
+			hProcess,
+			ptrFileName.get(),
+			ptrBaseName.get(),
+			reinterpret_cast<DWORD64>(mi.lpBaseOfDll),
+			mi.SizeOfImage
 		);
 		if (dwRes != ERROR_SUCCESS) {
 			GetLastError();
@@ -477,74 +449,57 @@ bool GetModuleListPSAPI(HANDLE hProcess) {
 		cnt++;
 	}
 	
-cleanup:
-	if (hPsapi) {
-		FreeLibrary(hPsapi);
-	}
-	freeMods(hMods, tt, tt2);
 	return cnt != 0;
 }  // GetModuleListPSAPI
 
 
+const std::vector<std::wstring> dllNames = { L"kernel32.dll", L"tlhelp32.dll" };
+
 bool GetModuleListTH32(HANDLE hProcess, DWORD pid) {
-	// CreateToolhelp32Snapshot()
-	typedef HANDLE (__stdcall *tCT32S)(DWORD dwFlags, DWORD th32ProcessID);
-	// Module32First()
-	typedef BOOL (__stdcall *tM32F)(HANDLE hSnapshot, LPMODULEENTRY32 lpme);
-	// Module32Next()
-	typedef BOOL (__stdcall *tM32N)(HANDLE hSnapshot, LPMODULEENTRY32 lpme);
-	
-	// try both dlls...
-	const TCHAR *dllname[] = { _T("kernel32.dll"), _T("tlhelp32.dll") };
-	HINSTANCE hToolhelp = nullptr;
-	tCT32S pCT32S = nullptr;
-	tM32F pM32F = nullptr;
-	tM32N pM32N = nullptr;
-	
-	HANDLE hSnap;
 	MODULEENTRY32 me;
 	me.dwSize = sizeof(me);
-	BOOL keepGoing;
-	size_t i;
 	
-	for (i = 0; i < (sizeof(dllname) / sizeof(dllname[0])); i++) {
-		hToolhelp = LoadLibrary(dllname[i]); // NOLINT
-		if (!hToolhelp) {
+	for (auto name: dllNames) {
+		PtrModule ptrToolHelp = makePtrModule(name.c_str());
+		if (!ptrToolHelp.get()) {
 			continue;
 		}
 		
-		pCT32S = (tCT32S) GetProcAddress(hToolhelp, "CreateToolhelp32Snapshot");
-		pM32F = (tM32F) GetProcAddress(hToolhelp, "Module32First");
-		pM32N = (tM32N) GetProcAddress(hToolhelp, "Module32Next");
-		if (pCT32S && pM32F && pM32N) {
-			break; // found the functions!
+		tCT32S pCreateToolhelp32Snapshot = reinterpret_cast<tCT32S>(
+			GetProcAddress(ptrToolHelp.get(), "CreateToolhelp32Snapshot")
+		);
+		tM32F pModule32First = reinterpret_cast<tM32F>(
+			GetProcAddress(ptrToolHelp.get(), "Module32First")
+		);
+		tM32N pModule32Next = reinterpret_cast<tM32N>(
+			GetProcAddress(ptrToolHelp.get(), "Module32Next")
+		);
+		
+		if (!pCreateToolhelp32Snapshot || !pModule32First || !pModule32Next) {
+			continue;
 		}
 		
-		FreeLibrary(hToolhelp);
-		hToolhelp = nullptr;
+		HANDLE hSnap = pCreateToolhelp32Snapshot(TH32CS_SNAPMODULE, pid);
+		if (hSnap == reinterpret_cast<HANDLE>(-1)) {
+			return false;
+		}
+		
+		bool keepGoing = !!pModule32First(hSnap, &me);
+		int cnt = 0;
+		while (keepGoing) {
+			LoadModule(
+				hProcess, me.szExePath, me.szModule,
+				reinterpret_cast<DWORD64>(me.modBaseAddr), me.modBaseSize
+			);
+			cnt++;
+			keepGoing = !!pModule32Next(hSnap, &me);
+		}
+		
+		CloseHandle(hSnap);
+		return cnt > 0;
 	}
 	
-	if (!hToolhelp) {
-		return false;
-	}
-	
-	hSnap = pCT32S(TH32CS_SNAPMODULE, pid);
-	if (hSnap == reinterpret_cast<HANDLE>(-1)) {
-		return false;
-	}
-	
-	keepGoing = !!pM32F(hSnap, &me);
-	int cnt = 0;
-	while (keepGoing) {
-		LoadModule(hProcess, me.szExePath, me.szModule, (DWORD64) me.modBaseAddr, me.modBaseSize);
-		cnt++;
-		keepGoing = !!pM32N(hSnap, &me);
-	}
-	
-	CloseHandle(hSnap);
-	FreeLibrary(hToolhelp);
-	
-	return cnt > 0;
+	return false;
 } // GetModuleListTH32
 
 
@@ -629,7 +584,64 @@ bool loadDbgFuncs() {
 }
 
 
-bool Init(HANDLE hProcess, LPCSTR szSymPath) {
+const size_t kTempLen = 1024;
+char szTemp[kTempLen];
+
+static inline std::string _buildSymbolsPath() {
+	std::stringstream ss;
+	ss << ".;";
+	
+	// Now add the current directory:
+	if (GetCurrentDirectoryA(kTempLen, szTemp) > 0) {
+		szTemp[kTempLen-1] = 0;
+		ss << szTemp << ";";
+	}
+	
+	// Now add the path for the main-module:
+	if (GetModuleFileNameA(nullptr, szTemp, kTempLen) > 0) {
+		szTemp[kTempLen-1] = 0;
+		for (char *p = (szTemp+strlen(szTemp)-1); p >= szTemp; --p) {
+			// locate the rightmost path separator
+			if ((*p == '\\') || (*p == '/') || (*p == ':')) {
+				*p = 0;
+				break;
+			}
+		}  // for (search for path separator...)
+		if (strlen(szTemp) > 0) {
+			ss << szTemp << ";";
+		}
+	}
+	
+	if (GetEnvironmentVariableA("_NT_SYMBOL_PATH", szTemp, kTempLen) > 0) {
+		szTemp[kTempLen-1] = 0;
+		ss << szTemp << ";";
+	}
+	
+	if (GetEnvironmentVariableA("_NT_ALTERNATE_SYMBOL_PATH", szTemp, kTempLen) > 0) {
+		szTemp[kTempLen-1] = 0;
+		ss << szTemp << ";";
+	}
+	
+	if (GetEnvironmentVariableA("SYSTEMROOT", szTemp, kTempLen) > 0) {
+		szTemp[kTempLen-1] = 0;
+		ss << szTemp << ";";
+		ss << szTemp << "\\system32;";
+	}
+	
+	ss << "SRV*";
+	if (GetEnvironmentVariableA("SYSTEMDRIVE", szTemp, kTempLen) > 0) {
+		szTemp[kTempLen-1] = 0;
+		ss << szTemp;
+	} else {
+		ss << "c:";
+	}
+	ss << "\\websymbols*http://msdl.microsoft.com/download/symbols;";
+	
+	return ss.str();
+}
+
+
+static inline bool _init(HANDLE hProcess) {
 	// Dynamically load the Entry-Points for dbghelp.dll:
 	if (!loadDbgHelpDll()) {
 		return false;
@@ -642,7 +654,8 @@ bool Init(HANDLE hProcess, LPCSTR szSymPath) {
 		return false;
 	}
 	
-	if (!pSI(hProcess, nullptr, FALSE)) {
+	std::string symbolsPath = _buildSymbolsPath();
+	if (!pSI(hProcess, symbolsPath.c_str(), FALSE)) {
 		GetLastError();
 	}
 	
@@ -660,7 +673,7 @@ bool Init(HANDLE hProcess, LPCSTR szSymPath) {
 }
 
 
-inline void initEntityStrings(CallstackEntry *csEntry) {
+static inline void initEntityStrings(CallstackEntry *csEntry) {
 	csEntry->name[0] = 0;
 	csEntry->undName[0] = 0;
 	csEntry->undFullName[0] = 0;
@@ -673,7 +686,7 @@ inline void initEntityStrings(CallstackEntry *csEntry) {
 }
 
 
-inline void setSymType(SYM_TYPE SymType, CallstackEntry *csEntry) {
+static inline void setSymType(SYM_TYPE SymType, CallstackEntry *csEntry) {
 	switch (SymType) {
 	case SymNone:
 		csEntry->symTypeString = "-nosymbols-";
@@ -711,11 +724,11 @@ inline void setSymType(SYM_TYPE SymType, CallstackEntry *csEntry) {
 }
 
 
-void handleOutput(std::ofstream &outfile, LPCSTR buffer) {
-	std::cerr << buffer << std::endl;
+void handleOutput(std::ofstream &outfile, const std::string& text) {
+	std::cerr << text << std::endl;
 	
 	if (outfile.is_open()) {
-		outfile << buffer << std::endl;
+		outfile << text << std::endl;
 		
 		if (outfile.bad()) {
 			std::cerr << "SegfaultHandler: Error writing to file." << std::endl;
@@ -725,43 +738,39 @@ void handleOutput(std::ofstream &outfile, LPCSTR buffer) {
 
 
 void handleStackEntry(std::ofstream &outfile, CallstackEntryType eType, CallstackEntry *entry) {
-	CHAR buffer[STACKWALK_MAX_NAMELEN];
-	
-	if ((eType != lastEntry) && (entry->offset != 0)) {
-		if (entry->undFullName[0]) {
-			strcpy_s(entry->name, entry->undFullName);
-		} else if (entry->undName[0]) {
-			strcpy_s(entry->name, entry->undName);
-		}
-		
-		if (!entry->name[0] && !entry->lineFileName[0] && !entry->moduleName[0]) {
-			return;
-		}
-		
-		if (!entry->name[0]) {
-			strcpy_s(entry->name, "(#unknown_function)");
-		}
-		
-		if (!entry->lineFileName[0]) {
-			strcpy_s(entry->lineFileName, "(#unknown_file)");
-			if (!entry->moduleName[0]) {
-				strcpy_s(entry->moduleName, "#unknown_moudle");
-			}
-			_snprintf_s(
-				buffer, STACKWALK_MAX_NAMELEN, "%p (%s): %s: %s",
-				(LPVOID) entry->offset, entry->moduleName,
-				entry->lineFileName, entry->name
-			);
-		} else {
-			_snprintf_s(
-				buffer,
-				STACKWALK_MAX_NAMELEN,
-				"%s (%d): %s",
-				entry->lineFileName, entry->lineNumber, entry->name
-			);
-		}
-		handleOutput(outfile, buffer);
+	if (eType == lastEntry || !entry->offset) {
+		return;
 	}
+	
+	CHAR *pName = entry->name;
+	if (entry->undFullName[0]) {
+		CHAR *pName = entry->undFullName;
+		// strcpy_s(entry->name, entry->undFullName);
+	} else if (entry->undName[0]) {
+		CHAR *pName = entry->undName;
+		// strcpy_s(entry->name, entry->undName);
+	}
+	
+	if (!pName[0] && !entry->lineFileName[0] && !entry->moduleName[0]) {
+		return;
+	}
+	
+	std::stringstream ss;
+	if (!entry->lineFileName[0]) {
+		ss << "0x" << std::hex << static_cast<size_t>(entry->offset);
+		
+		if (entry->moduleName[0]) {
+			ss << " [" << entry->moduleName << "]";
+		}
+		
+		if (pName[0]) {
+			ss << ": " << pName;
+		}
+	} else {
+		ss << entry->lineFileName[0] << " (" << entry->lineNumber << "): " << pName;
+	}
+	
+	handleOutput(outfile, ss.str());
 }
 
 
@@ -772,26 +781,24 @@ BOOL __stdcall myReadProcMem(
 	DWORD nSize,
 	LPDWORD lpNumberOfBytesRead
 ) {
-	if (!s_readMemoryFunction) {
-		SIZE_T st;
-		BOOL bRet = ReadProcessMemory(hProcess, (LPVOID) qwBaseAddress, lpBuffer, nSize, &st);
-		*lpNumberOfBytesRead = (DWORD) st;
-		return bRet;
-	}
-	
-	return s_readMemoryFunction(
-		hProcess,
-		qwBaseAddress,
-		lpBuffer,
-		nSize,
-		lpNumberOfBytesRead,
-		s_readMemoryFunction_UserData
-	);
+	SIZE_T st;
+	BOOL bRet = ReadProcessMemory(hProcess, (LPVOID) qwBaseAddress, lpBuffer, nSize, &st);
+	*lpNumberOfBytesRead = static_cast<DWORD>(st);
+	return bRet;
 }
 
 
-inline void iterateFrames(std::ofstream &outfile, HANDLE hProcess, HANDLE hThread, CONTEXT *c, void *_pSym) {
-	IMAGEHLP_SYMBOL64 *pSym = reinterpret_cast<IMAGEHLP_SYMBOL64*>(_pSym);
+static inline CONTEXT getValidContext() {
+	CONTEXT ctx;
+	memset(&ctx, 0, sizeof(CONTEXT));
+	ctx.ContextFlags = USED_CONTEXT_FLAGS;
+	RtlCaptureContext(&ctx);
+	return ctx;
+}
+
+
+static inline void iterateFrames(std::ofstream &outfile, PtrSymbol &ptrSymbol) {
+	CONTEXT ctx = getValidContext();
 	
 	// init STACKFRAME for first call
 	STACKFRAME64 s; // in/out stackframe
@@ -799,21 +806,21 @@ inline void iterateFrames(std::ofstream &outfile, HANDLE hProcess, HANDLE hThrea
 	DWORD imageType;
 #ifdef _M_X64
 	imageType = IMAGE_FILE_MACHINE_AMD64;
-	s.AddrPC.Offset = c->Rip;
+	s.AddrPC.Offset = ctx.Rip;
 	s.AddrPC.Mode = AddrModeFlat;
-	s.AddrFrame.Offset = c->Rsp;
+	s.AddrFrame.Offset = ctx.Rsp;
 	s.AddrFrame.Mode = AddrModeFlat;
-	s.AddrStack.Offset = c->Rsp;
+	s.AddrStack.Offset = ctx.Rsp;
 	s.AddrStack.Mode = AddrModeFlat;
 #elif _M_IA64
 	imageType = IMAGE_FILE_MACHINE_IA64;
-	s.AddrPC.Offset = c->StIIP;
+	s.AddrPC.Offset = ctx.StIIP;
 	s.AddrPC.Mode = AddrModeFlat;
-	s.AddrFrame.Offset = c->IntSp;
+	s.AddrFrame.Offset = ctx.IntSp;
 	s.AddrFrame.Mode = AddrModeFlat;
-	s.AddrBStore.Offset = c->RsBSP;
+	s.AddrBStore.Offset = ctx.RsBSP;
 	s.AddrBStore.Mode = AddrModeFlat;
-	s.AddrStack.Offset = c->IntSp;
+	s.AddrStack.Offset = ctx.IntSp;
 	s.AddrStack.Mode = AddrModeFlat;
 #else
 	#error "Platform not supported!"
@@ -829,13 +836,16 @@ inline void iterateFrames(std::ofstream &outfile, HANDLE hProcess, HANDLE hThrea
 	memset(&Line, 0, sizeof(Line));
 	Line.SizeOfStruct = sizeof(Line);
 	
+	HANDLE hThread = GetCurrentThread();
+	HANDLE hProcess = GetCurrentProcess();
+	
 	for (int frameNum = 0; ; ++frameNum) {
 		// get next stack frame (StackWalk64(), SymFunctionTableAccess64(), SymGetModuleBase64())
 		// if this returns ERROR_INVALID_ADDRESS (487) or ERROR_NOACCESS (998), you can
 		// assume that either you are done, or that the stack is so hosed that the next
 		// deeper frame could not be found.
 		// CONTEXT need not to be suplied if imageTyp is IMAGE_FILE_MACHINE_I386!
-		if (!pSW(imageType, hProcess, hThread, &s, c, myReadProcMem, pSFTA, pSGMB, nullptr)) {
+		if (!pSW(imageType, hProcess, hThread, &s, &ctx, myReadProcMem, pSFTA, pSGMB, nullptr)) {
 			GetLastError();
 			break;
 		}
@@ -851,15 +861,15 @@ inline void iterateFrames(std::ofstream &outfile, HANDLE hProcess, HANDLE hThrea
 		if (s.AddrPC.Offset) {
 			// we seem to have a valid PC
 			// show procedure info (SymGetSymFromAddr64())
-			if (pSGSFA(hProcess, s.AddrPC.Offset, &(csEntry.offsetFromSmybol), pSym)) {
+			if (pSGSFA(hProcess, s.AddrPC.Offset, &(csEntry.offsetFromSmybol), ptrSymbol.get())) {
 				// TODO: Mache dies sicher...!
-				strcpy_s(csEntry.name, pSym->Name);
+				strcpy_s(csEntry.name, ptrSymbol->Name);
 				// UnDecorateSymbolName()
 				pUDSN(
-					pSym->Name, csEntry.undName, STACKWALK_MAX_NAMELEN, UNDNAME_NAME_ONLY
+					ptrSymbol->Name, csEntry.undName, STACKWALK_MAX_NAMELEN, UNDNAME_NAME_ONLY
 				);
 				pUDSN(
-					pSym->Name, csEntry.undFullName, STACKWALK_MAX_NAMELEN, UNDNAME_COMPLETE
+					ptrSymbol->Name, csEntry.undFullName, STACKWALK_MAX_NAMELEN, UNDNAME_COMPLETE
 				);
 			} else {
 				GetLastError();
@@ -908,140 +918,37 @@ inline void iterateFrames(std::ofstream &outfile, HANDLE hProcess, HANDLE hThrea
 }
 
 
-inline void buildSymPath(char *szSymPath) {
-	szSymPath[0] = 0;
-	
-	strcat_s(szSymPath, nSymPathLen, ".;");
-	
-	const size_t kTempLen = 1024;
-	char szTemp[kTempLen];
-	// Now add the current directory:
-	if (GetCurrentDirectoryA(kTempLen, szTemp) > 0) {
-		szTemp[kTempLen-1] = 0;
-		strcat_s(szSymPath, nSymPathLen, szTemp);
-		strcat_s(szSymPath, nSymPathLen, ";");
-	}
-	
-	// Now add the path for the main-module:
-	if (GetModuleFileNameA(nullptr, szTemp, kTempLen) > 0) {
-		szTemp[kTempLen-1] = 0;
-		for (char *p = (szTemp+strlen(szTemp)-1); p >= szTemp; --p) {
-			// locate the rightmost path separator
-			if ((*p == '\\') || (*p == '/') || (*p == ':')) {
-				*p = 0;
-				break;
-			}
-		}  // for (search for path separator...)
-		if (strlen(szTemp) > 0) {
-			strcat_s(szSymPath, nSymPathLen, szTemp);
-			strcat_s(szSymPath, nSymPathLen, ";");
-		}
-	}
-	
-	if (GetEnvironmentVariableA("_NT_SYMBOL_PATH", szTemp, kTempLen) > 0) {
-		szTemp[kTempLen-1] = 0;
-		strcat_s(szSymPath, nSymPathLen, szTemp);
-		strcat_s(szSymPath, nSymPathLen, ";");
-	}
-	
-	if (GetEnvironmentVariableA("_NT_ALTERNATE_SYMBOL_PATH", szTemp, kTempLen) > 0) {
-		szTemp[kTempLen-1] = 0;
-		strcat_s(szSymPath, nSymPathLen, szTemp);
-		strcat_s(szSymPath, nSymPathLen, ";");
-	}
-	
-	if (GetEnvironmentVariableA("SYSTEMROOT", szTemp, kTempLen) > 0) {
-		szTemp[kTempLen-1] = 0;
-		strcat_s(szSymPath, nSymPathLen, szTemp);
-		strcat_s(szSymPath, nSymPathLen, ";");
-		// also add the "system32"-directory:
-		strcat_s(szTemp, kTempLen, "\\system32");
-		strcat_s(szSymPath, nSymPathLen, szTemp);
-		strcat_s(szSymPath, nSymPathLen, ";");
-	}
-	
-	if (GetEnvironmentVariableA("SYSTEMDRIVE", szTemp, kTempLen) > 0) {
-		szTemp[kTempLen-1] = 0;
-		strcat_s(szSymPath, nSymPathLen, "SRV*");
-		strcat_s(szSymPath, nSymPathLen, szTemp);
-		strcat_s(szSymPath, nSymPathLen, "\\websymbols");
-		strcat_s(szSymPath, nSymPathLen, "*http://msdl.microsoft.com/download/symbols;");
-	} else {
-		strcat_s(
-			szSymPath,
-			nSymPathLen,
-			"SRV*c:\\websymbols*http://msdl.microsoft.com/download/symbols;"
-		);
-	}
-}
-
-
-bool loadModules(HANDLE hProcess) {
-	DWORD dwProcessId = GetCurrentProcessId();
-	// Build the sym-path:
-	char *szSymPath = nullptr;
-	
-	szSymPath = reinterpret_cast<char*>(malloc(nSymPathLen));
-	if (!szSymPath) {
-		SetLastError(ERROR_NOT_ENOUGH_MEMORY);
-		return false;
-	}
-	buildSymPath(szSymPath);
-	
-	// First Init the whole stuff...
-	bool bRet = Init(hProcess, szSymPath);
-	if (szSymPath) {
-		free(szSymPath);
-		szSymPath = nullptr;
-	}
+static inline void _preloadInvolvedModules() {
+	HANDLE hProcess = GetCurrentProcess();
+	bool bRet = _init(hProcess);
 	
 	if (!bRet) {
 		GetLastError();
 		SetLastError(ERROR_DLL_INIT_FAILED);
-		return false;
+		return;
 	}
 	
-	bRet = LoadModules(hProcess, dwProcessId);
-	
-	return bRet;
-}
-
-inline void getValidContext(CONTEXT *dest) {
-	memset(dest, 0, sizeof(CONTEXT));
-	dest->ContextFlags = USED_CONTEXT_FLAGS;
-	RtlCaptureContext(dest);
+	DWORD dwProcessId = GetCurrentProcessId();
+	LoadModules(hProcess, dwProcessId);
 }
 
 
 void showCallstack(std::ofstream &outfile) {
-	HANDLE hProcess = GetCurrentProcess();
-	HANDLE hThread = GetCurrentThread();
-	
-	loadModules(hProcess);
+	_preloadInvolvedModules();
 	
 	if (!m_hDbhHelp) {
 		SetLastError(ERROR_DLL_INIT_FAILED);
 		return;
 	}
 	
-	s_readMemoryFunction = nullptr;
-	s_readMemoryFunction_UserData = nullptr;
-	
-	CONTEXT c;
-	getValidContext(&c);
-	
-	IMAGEHLP_SYMBOL64 *pSym = reinterpret_cast<IMAGEHLP_SYMBOL64*>(
-		malloc(sizeof(IMAGEHLP_SYMBOL64) + STACKWALK_MAX_NAMELEN)
-	);
-	
-	if (pSym) {
-		memset(pSym, 0, sizeof(IMAGEHLP_SYMBOL64) + STACKWALK_MAX_NAMELEN);
-		pSym->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
-		pSym->MaxNameLength = STACKWALK_MAX_NAMELEN;
-		
-		iterateFrames(outfile, hProcess, hThread, &c, pSym);
-		free(pSym);
+	PtrSymbol ptrSymbol = std::make_unique<IMAGEHLP_SYMBOL64_NAMED>();
+	if (!ptrSymbol.get()) {
+		return;
 	}
 	
-	ResumeThread(hThread);
+	memset(ptrSymbol.get(), 0, sizeof(IMAGEHLP_SYMBOL64_NAMED));
+	ptrSymbol->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
+	ptrSymbol->MaxNameLength = STACKWALK_MAX_NAMELEN;
+	
+	iterateFrames(outfile, ptrSymbol);
 }

@@ -231,15 +231,22 @@ void _writeTimeToFile(std::ofstream &outfile) {
 	}
 }
 
+static inline void _writeHeaderToOstream(std::ostream &stream, int pid, uint32_t signalId, uint64_t address) {
+	stream
+		<< "\nPID " << pid << " received " << signalNames.at(signalId)
+		<< " for address: 0x" << std::hex << address << std::endl;
+}
+
+
 static inline void _writeLogHeader(std::ofstream &outfile, uint32_t signalId, uint64_t address) {
 	int pid = GETPID();
-	std::cerr << "\nPID " << pid << " received " << signalNames.at(signalId) << " for address: " << address << std::endl;
+	_writeHeaderToOstream(std::cerr, pid, signalId, address);
 	
 	if (!outfile.is_open()) {
 		return;
 	}
 	
-	outfile << "\nPID " << pid << " received " << signalNames.at(signalId) << " for address: " << address << std::endl;
+	_writeHeaderToOstream(outfile, pid, signalId, address);
 	if (outfile.bad()) {
 		std::cerr << "SegfaultHandler: Error writing to file." << std::endl;
 	}
@@ -385,12 +392,17 @@ JS_METHOD(setSignal) { NAPI_ENV;
 }
 
 
+// On Windows, a single handler is set on startup.
+// On Unix, handlers for every signal are set on-demand.
+// `SetThreadStackGuarantee` and `sigaltstack` help in handling stack overflows on their platforms.
 void init() {
 	#ifdef _WIN32
 		SetUnhandledExceptionFilter(handleSignal);
+	#endif
+		
+	#ifdef _WIN32
 		ULONG size = 32 * 1024;
 		SetThreadStackGuarantee(&size);
-		std::cout << "size " << size << " " << GetLastError() << std::endl;
 	#else
 		sigaltstack(&_altStack, nullptr);
 	#endif
