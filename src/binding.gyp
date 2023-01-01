@@ -11,7 +11,6 @@
 		'include_dirs': [
 			'<!@(node -p "require(\'addon-tools-raub\').include")',
 		],
-		'defines': ['UNICODE', '_UNICODE'],
 		'cflags_cc': ['-std=c++17', '-fno-exceptions'],
 		'cflags': ['-O0', '-funwind-tables', '-fno-exceptions'],
 		'conditions': [
@@ -39,7 +38,7 @@
 						],
 					},
 					'VCLinkerTool': {
-						'AdditionalOptions' : ['/DEBUG:NONE', '/LTCG'],
+						'AdditionalOptions' : ['/DEBUG', '/LTCG', '/OPT:NOREF'],
 					},
 				},
 			}],

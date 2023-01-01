@@ -3,16 +3,18 @@
 
 #include <addon-tools.hpp>
 
+#include "bindings.hpp"
+
 
 namespace segfault {
-	void init();
-	void registerHandler();
+	EXPORT void init();
+	EXPORT void registerHandler();
 	
-	JS_METHOD(causeSegfault);
-	JS_METHOD(causeDivisionInt);
-	JS_METHOD(causeOverflow);
-	JS_METHOD(causeIllegal);
-	JS_METHOD(setSignal);
+	EXPORT JS_METHOD(causeSegfault);
+	EXPORT JS_METHOD(causeDivisionInt);
+	EXPORT JS_METHOD(causeOverflow);
+	EXPORT JS_METHOD(causeIllegal);
+	EXPORT JS_METHOD(setSignal);
 }
 
 

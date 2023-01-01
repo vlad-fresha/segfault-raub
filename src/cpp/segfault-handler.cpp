@@ -75,14 +75,14 @@ const std::map<uint32_t, std::string> signalNames = {
 	{ SIGFPE, "SIGFPE" },
 	{ SIGSEGV, "SIGSEGV" },
 	{ SIGTERM, "SIGTERM" },
-	{ SIGILL, "SIGILL" },
+	{ SIGILL, "SIGIL" },
 	{ SIGINT, "SIGINT" },
 	{ SIGALRM, "SIGALRM" },
 	{ SIGBUS, "SIGBUS" },
 	{ SIGCHLD, "SIGCHLD" },
 	{ SIGCONT, "SIGCONT" },
 	{ SIGHUP, "SIGHUP" },
-	{ SIGKILL, "SIGKILL" },
+	{ SIGKILL, "SIGKIL" },
 	{ SIGPIPE, "SIGPIPE" },
 	{ SIGQUIT, "SIGQUIT" },
 	{ SIGSTOP, "SIGSTOP" },
@@ -180,7 +180,7 @@ static inline std::pair<uint32_t, uint64_t> _getSignalAndAddress(siginfo_t *info
 
 
 // Write stack trace to outfile and cerr
-void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
+static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 #ifdef _WIN32
 	showCallstack(outfile);
 #else
@@ -205,7 +205,7 @@ void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 }
 
 
-std::ofstream _openLogFile() {
+static inline std::ofstream _openLogFile() {
 	std::ofstream outfile;
 	
 	if (!std::filesystem::exists("segfault.log")) {
@@ -218,7 +218,7 @@ std::ofstream _openLogFile() {
 	return outfile;
 }
 
-void _writeTimeToFile(std::ofstream &outfile) {
+static inline void _writeTimeToFile(std::ofstream &outfile) {
 	if (!outfile.is_open()) {
 		return;
 	}
@@ -252,14 +252,14 @@ static inline void _writeLogHeader(std::ofstream &outfile, uint32_t signalId, ui
 	}
 }
 
-void _closeLogFile(std::ofstream &outfile) {
+static inline void _closeLogFile(std::ofstream &outfile) {
 	if (outfile.is_open()) {
 		outfile.close();
 	}
 }
 
 
-SEGFAULT_HANDLER {
+EXPORT SEGFAULT_HANDLER {
 	auto signalAndAdress = _getSignalAndAddress(info);
 	uint32_t signalId = signalAndAdress.first;
 	uint64_t address = signalAndAdress.second;
@@ -281,38 +281,38 @@ SEGFAULT_HANDLER {
 
 
 // create some stack frames to inspect from CauseSegfault
-NO_INLINE void _segfaultStackFrame1() {
+EXPORT NO_INLINE void _segfaultStackFrame1() {
 	int *foo = reinterpret_cast<int*>(1);
 	*foo = 42; // triggers a segfault exception
 }
 
-NO_INLINE void _segfaultStackFrame2(void) {
+EXPORT NO_INLINE void _segfaultStackFrame2(void) {
 	void (*fn_ptr)() = _segfaultStackFrame1;
 	fn_ptr();
 }
 
 
-JS_METHOD(causeSegfault) { NAPI_ENV;
+EXPORT JS_METHOD(causeSegfault) { NAPI_ENV;
 	std::cout << "SegfaultHandler: about to cause a segfault..." << std::endl;
 	void (*fn_ptr)() = _segfaultStackFrame2;
 	fn_ptr();
 	RET_UNDEFINED;
 }
 
-NO_INLINE void _divideInt() {
+EXPORT NO_INLINE void _divideInt() {
 	volatile int a = 42;
 	volatile int b = 0;
 	a /= b;
 }
 
 
-JS_METHOD(causeDivisionInt) { NAPI_ENV;
+EXPORT JS_METHOD(causeDivisionInt) { NAPI_ENV;
 	_divideInt();
 	RET_UNDEFINED;
 }
 
 
-NO_INLINE void _overflowStack() {
+EXPORT NO_INLINE void _overflowStack() {
 	int foo[1000];
 	foo[999] = 1;
 	std::vector<int> empty = { foo[999] };
@@ -322,14 +322,14 @@ NO_INLINE void _overflowStack() {
 	_overflowStack(); // infinite recursion
 }
 
-JS_METHOD(causeOverflow) { NAPI_ENV;
+EXPORT JS_METHOD(causeOverflow) { NAPI_ENV;
 	std::cout << "SegfaultHandler: about to overflow the stack..." << std::endl;
 	_overflowStack();
 	RET_UNDEFINED;
 }
 
 
-JS_METHOD(causeIllegal) { NAPI_ENV;
+EXPORT JS_METHOD(causeIllegal) { NAPI_ENV;
 	std::cout << "SegfaultHandler: about to raise an illegal operation..." << std::endl;
 #ifdef _WIN32
 	RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION, 0, 0, nullptr);
@@ -340,7 +340,7 @@ JS_METHOD(causeIllegal) { NAPI_ENV;
 }
 
 
-void _enableSignal(uint32_t signalId) {
+static inline void _enableSignal(uint32_t signalId) {
 	#ifndef _WIN32
 		struct sigaction action;
 		memset(&action, 0, sizeof(struct sigaction));
@@ -357,14 +357,14 @@ void _enableSignal(uint32_t signalId) {
 	#endif
 }
 
-void _disableSignal(uint32_t signalId) {
+static inline void _disableSignal(uint32_t signalId) {
 	#ifndef _WIN32
 		signal(signalId, SIG_DFL);
 	#endif
 }
 
 
-JS_METHOD(setSignal) { NAPI_ENV;
+EXPORT JS_METHOD(setSignal) { NAPI_ENV;
 	if (IS_ARG_EMPTY(0)) {
 		RET_UNDEFINED;
 	}
@@ -395,11 +395,11 @@ JS_METHOD(setSignal) { NAPI_ENV;
 // On Windows, a single handler is set on startup.
 // On Unix, handlers for every signal are set on-demand.
 // `SetThreadStackGuarantee` and `sigaltstack` help in handling stack overflows on their platforms.
-void init() {
+EXPORT void init() {
 	#ifdef _WIN32
 		SetUnhandledExceptionFilter(handleSignal);
 	#endif
-		
+	
 	#ifdef _WIN32
 		ULONG size = 32 * 1024;
 		SetThreadStackGuarantee(&size);

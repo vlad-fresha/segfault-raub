@@ -3,6 +3,11 @@
 
 #include <fstream>
 
-void showCallstack(std::ofstream &outfile);
+#include "bindings.hpp"
+
+
+namespace segfault {
+	EXPORT void showCallstack(std::ofstream &outfile);
+}
 
 #endif /* _STACK_WINDOWS_HPP_ */

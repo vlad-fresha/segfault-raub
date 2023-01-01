@@ -29,9 +29,9 @@
 	"scripts": {
 		"postinstall": "node install",
 		"eslint": "eslint .",
-		"build": "cd src && node-gyp rebuild && cd ..",
-		"rebuild-dev": "cd src && node-gyp rebuild && node -e \"require('../node_modules/addon-tools-raub/cpbin')('segfault')\" && cd ..",
-		"build-dev": "cd src && node-gyp build && node -e \"require('../node_modules/addon-tools-raub/cpbin')('segfault')\" && cd ..",
+		"build": "cd src && node-gyp rebuild -j max --silent && cd ..",
+		"rebuild-dev": "cd src && node-gyp rebuild -j max --silent && node -e \"require('../node_modules/addon-tools-raub/cpbin')('segfault')\" && cd ..",
+		"build-dev": "cd src && node-gyp build -j max --silent && node -e \"require('../node_modules/addon-tools-raub/cpbin')('segfault')\" && cd ..",
 		"test": "jest --coverage=false --watch",
 		"test-ci": "jest --ci --runInBand --coverage=false --forceExit --detectOpenHandles",
 		"test-coverage": "rm -rf doc/jest && jest --coverage --silent"
