@@ -75,7 +75,7 @@ const std::map<uint32_t, std::string> signalNames = {
 	{ SIGFPE, "SIGFPE" },
 	{ SIGSEGV, "SIGSEGV" },
 	{ SIGTERM, "SIGTERM" },
-	{ SIGILL, "SIGIL" },
+	{ SIGILL, "SIGILL" },
 	{ SIGINT, "SIGINT" },
 	{ SIGALRM, "SIGALRM" },
 	{ SIGBUS, "SIGBUS" },
