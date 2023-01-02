@@ -38,7 +38,7 @@
 						],
 					},
 					'VCLinkerTool': {
-						'AdditionalOptions' : ['/DEBUG', '/LTCG', '/OPT:NOREF'],
+						'AdditionalOptions' : ['/DEBUG:NONE', '/LTCG', '/OPT:NOREF'],
 					},
 				},
 			}],
