@@ -190,6 +190,7 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 	int fd = open("segfault.log", O_CREAT | O_APPEND | O_WRONLY, S_IRUSR | S_IRGRP | S_IROTH);
 	backtrace_symbols_fd(array, size, fd);
 	close(fd);
+	backtrace_symbols_fd(array, size, stderr);
 #endif
 }
 
