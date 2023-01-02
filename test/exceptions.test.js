@@ -25,19 +25,16 @@ describe('Exceptions', () => {
 		expect(response).toContain(exceptionName);
 	});
 	
-	// These don't work properly on ARM
-	if (platform === 'windows') {
-		it('shows module names in Windows stacktrace', async () => {
-			let response = await runAndGetError('causeSegfault');
-			
-			expect(response).toContain('[node.exe]');
-			expect(response).toContain('[segfault.node]');
-		});
-		it('shows symbol names in Windows stacktrace', async () => {
-			let response = await runAndGetError('causeSegfault');
-			expect(response).toContain('segfault::causeSegfault');
-		});
-	}
+	it('shows symbol names in stacktrace', async () => {
+		let response = await runAndGetError('causeSegfault');
+		expect(response).toContain(/segfault\w+causeSegfault/);
+	});
+	
+	it('shows module names in stacktrace', async () => {
+		let response = await runAndGetError('causeSegfault');
+		expect(response).toContain('node');
+		expect(response).toContain('segfault.node');
+	});
 	
 	// These don't work properly on ARM
 	if (['windows', 'linux'].includes(platform)) {
