@@ -188,9 +188,12 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 	void *array[32];
 	size_t size = backtrace(array, 32);
 	int fd = open("segfault.log", O_CREAT | O_APPEND | O_WRONLY, S_IRUSR | S_IRGRP | S_IROTH);
-	backtrace_symbols_fd(array, size, fd);
-	close(fd);
-	backtrace_symbols_fd(array, size, stderr);
+	if (fd > 0) {
+		backtrace_symbols_fd(array, size, fd);
+		close(fd);
+	}
+	constexpr int STDERR_FD = 2;
+	backtrace_symbols_fd(array, size, STDERR_FD);
 #endif
 }
 
