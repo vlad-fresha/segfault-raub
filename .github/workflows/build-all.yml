@@ -37,7 +37,7 @@ jobs:
           draft: true
           tag_name: ${{ steps.package-version.outputs.current-version }}
           name: Release ${{ steps.package-version.outputs.current-version }}
-          body: Built at ${{ github.sha }}
+          body: Binaries at ${{ github.sha }}
 
   build:
     strategy:
@@ -59,19 +59,19 @@ jobs:
           node-version: 18.12.1
           cache: 'npm'
 
-      - name: Get Npm Version
-        id: package-version
-        uses: martinbeentjes/npm-get-version-action@master
-
       - name: Install Modules
         run: npm ci --ignore-scripts
 
       - name: Build Current Binary
         run: npm run build-all
 
-      - name: Zip the binaries
+      - name: Get Package Version
+        id: package-version
+        run: node action-version >> $GITHUB_OUTPUT
+
+      - name: Zip Files
         id: zip-files
-        run: node zip >> $GITHUB_OUTPUT
+        run: node action-zip >> $GITHUB_OUTPUT
 
       - name: Store Binaries
         uses: softprops/action-gh-release@v1
@@ -79,6 +79,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           draft: true
-          tag_name: ${{ steps.package-version.outputs.current-version }}
-          name: Release ${{ steps.package-version.outputs.current-version }}
+          tag_name: ${{ steps.package-version.outputs.version }}
+          name: Release ${{ steps.package-version.outputs.version }}
           files: ${{ steps.zip-files.outputs.zip }}
