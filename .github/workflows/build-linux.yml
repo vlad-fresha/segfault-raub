@@ -36,4 +36,4 @@ jobs:
           tag_name: linux-${{ github.run }}-${{ github.sha }}
           name: Linux
           body: Linux binaries at ${{ github.sha }}
-          files: src/build/Release/segfault.node
+          files: bin-linux/segfault.node

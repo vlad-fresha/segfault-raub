@@ -37,7 +37,7 @@ jobs:
           draft: true
           tag_name: ${{ steps.package-version.outputs.current-version }}
           name: Release ${{ steps.package-version.outputs.current-version }}
-          body: Update ${{ steps.package-version.outputs.current-version }}
+          body: Built at ${{ github.sha }}
 
   build:
     strategy:

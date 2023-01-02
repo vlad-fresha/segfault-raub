@@ -36,4 +36,4 @@ jobs:
           tag_name: windows-${{ github.run }}-${{ github.sha }}
           name: Windows
           body: Windows binaries at ${{ github.sha }}
-          files: src/build/Release/segfault.node
+          files: bin-windows/segfault.node

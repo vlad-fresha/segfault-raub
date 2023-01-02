@@ -36,4 +36,4 @@ jobs:
           tag_name: osx-${{ github.run }}-${{ github.sha }}
           name: OSX
           body: OSX binaries at ${{ github.sha }}
-          files: src/build/Release/segfault.node
+          files: bin-osx/segfault.node
