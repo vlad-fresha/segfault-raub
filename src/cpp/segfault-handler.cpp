@@ -1,4 +1,5 @@
-#include <memory>
+#include "segfault-handler.hpp"
+
 #include <map>
 #include <string>
 #include <filesystem>
@@ -17,8 +18,6 @@
 #include <unistd.h>
 #include <execinfo.h>
 #endif
-
-#include "segfault-handler.hpp"
 
 
 namespace segfault {
@@ -385,14 +384,14 @@ EXPORT JS_METHOD(setSignal) { NAPI_ENV;
 }
 
 
-// On Windows, a single handler is set on startup.
-// On Unix, handlers for every signal are set on-demand.
-// `SetThreadStackGuarantee` and `sigaltstack` help in handling stack overflows on their platforms.
 EXPORT void init() {
+	// On Windows, a single handler is set on startup.
+	// On Unix, handlers for every signal are set on-demand.
 	#ifdef _WIN32
 		SetUnhandledExceptionFilter(handleSignal);
 	#endif
 	
+	// `SetThreadStackGuarantee` and `sigaltstack` help in handling stack overflows on their platforms.
 	#ifdef _WIN32
 		ULONG size = 32 * 1024;
 		SetThreadStackGuarantee(&size);
@@ -400,11 +399,11 @@ EXPORT void init() {
 		sigaltstack(&_altStack, nullptr);
 	#endif
 	
-	for (auto pair: signalActivity) {
+	for (auto pair : signalActivity) {
 		if (pair.second) {
 			_enableSignal(pair.first);
 		}
 	}
 }
 
-}
+} // namespace segfault

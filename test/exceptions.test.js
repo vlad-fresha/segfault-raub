@@ -27,7 +27,7 @@ describe('Exceptions', () => {
 	
 	it('shows symbol names in stacktrace', async () => {
 		let response = await runAndGetError('causeSegfault');
-		expect(response).toContain(/segfault\w+causeSegfault/);
+		expect(response).toEqual(expect.stringMatching(/segfault\w+causeSegfault/));
 	});
 	
 	it('shows module names in stacktrace', async () => {

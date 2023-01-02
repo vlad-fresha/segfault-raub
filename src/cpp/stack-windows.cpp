@@ -1,3 +1,5 @@
+#include "stack-windows.hpp"
+
 #include <tchar.h>
 #include <iostream>
 #include <sstream>
@@ -9,7 +11,6 @@
 #include <stdlib.h>
 #include <psapi.h>
 
-#include "stack-windows.hpp"
 
 #pragma comment(lib, "version.lib") // for "VerQueryValue"
 
@@ -174,7 +175,8 @@ static inline bool loadPsapi(
 	*pGetModuleBaseNameA = _getProc<TGetModuleBaseNameA>(psapi, "GetModuleBaseNameA");
 	*pGetModuleInformation = _getProc<TGetModuleInformation>(psapi, "GetModuleInformation");
 	return (
-		*pEnumProcessModules && *pGetModuleFileNameExA && *pGetModuleBaseNameA && *pGetModuleInformation
+		*pEnumProcessModules && *pGetModuleFileNameExA &&
+		*pGetModuleBaseNameA && *pGetModuleInformation
 	);
 }
 
@@ -190,7 +192,8 @@ static inline bool _loadModulesWithPsapi(HANDLE hProcess) {
 		!ptrPsapi.get() ||
 		!loadPsapi(
 			ptrPsapi.get(),
-			&pEnumProcessModules, &pGetModuleFileNameExA, &pGetModuleBaseNameA, &pGetModuleInformation
+			&pEnumProcessModules, &pGetModuleFileNameExA,
+			&pGetModuleBaseNameA, &pGetModuleInformation
 		)
 	) {
 		return false;
@@ -232,13 +235,15 @@ static inline bool _loadModulesWithTh32(HANDLE hProcess, DWORD pid) {
 	MODULEENTRY32 me;
 	me.dwSize = sizeof(me);
 	
-	for (auto name: toolDllNames) {
+	for (auto name : toolDllNames) {
 		PtrLibrary ptrToolHelp = _makePtrModule(name.c_str());
 		if (!ptrToolHelp.get()) {
 			continue;
 		}
 		
-		TCreateToolhelp32Snapshot pCreateToolhelp32Snapshot = _getProc<TCreateToolhelp32Snapshot>(ptrToolHelp.get(), "CreateToolhelp32Snapshot");
+		TCreateToolhelp32Snapshot pCreateToolhelp32Snapshot = _getProc<TCreateToolhelp32Snapshot>(
+			ptrToolHelp.get(), "CreateToolhelp32Snapshot"
+		);
 		TModule32First pModule32First = _getProc<TModule32First>(ptrToolHelp.get(), "Module32First");
 		TModule32Next pModule32Next = _getProc<TModule32Next>(ptrToolHelp.get(), "Module32Next");
 		
@@ -297,7 +302,9 @@ static inline bool _loadDbgFuncs(HMODULE dbgHelpDll) {
 	pStackWalk64 = _getProc<TStackWalk64>(dbgHelpDll, "StackWalk64");
 	pSymGetOptions = _getProc<TSymGetOptions>(dbgHelpDll, "SymGetOptions");
 	pSymSetOptions = _getProc<TSymSetOptions>(dbgHelpDll, "SymSetOptions");
-	pSymFunctionTableAccess64 = _getProc<TSymFunctionTableAccess64>(dbgHelpDll, "SymFunctionTableAccess64");
+	pSymFunctionTableAccess64 = _getProc<TSymFunctionTableAccess64>(
+		dbgHelpDll, "SymFunctionTableAccess64"
+	);
 	pSymGetLineFromAddr64 = _getProc<TSymGetLineFromAddr64>(dbgHelpDll, "SymGetLineFromAddr64");
 	pSymGetModuleBase64 = _getProc<TSymGetModuleBase64>(dbgHelpDll, "SymGetModuleBase64");
 	pSymGetModuleInfo = _getProc<TSymGetModuleInfo>(dbgHelpDll, "SymGetModuleInfo");
@@ -559,4 +566,4 @@ EXPORT void showCallstack(std::ofstream &outfile) {
 	}
 }
 
-}
+} // namespace segfault
