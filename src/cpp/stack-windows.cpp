@@ -1,5 +1,3 @@
-#include "stack-windows.hpp"
-
 #include <tchar.h>
 #include <iostream>
 #include <sstream>
@@ -10,6 +8,8 @@
 #include <tlhelp32.h>
 #include <stdlib.h>
 #include <psapi.h>
+
+#include "stack-windows.hpp"
 
 
 #pragma comment(lib, "version.lib") // for "VerQueryValue"
@@ -129,7 +129,7 @@ static inline bool _getLastPathSegment(char *path) {
 	while (p > path) {
 		// locate the rightmost path separator
 		if (*p == '\\' || *p == '/') {
-			*p++;
+			p++;
 			break;
 		}
 		p--;

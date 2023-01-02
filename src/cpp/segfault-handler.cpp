@@ -1,5 +1,3 @@
-#include "segfault-handler.hpp"
-
 #include <map>
 #include <string>
 #include <filesystem>
@@ -18,6 +16,8 @@
 #include <unistd.h>
 #include <execinfo.h>
 #endif
+
+#include "segfault-handler.hpp"
 
 
 namespace segfault {
@@ -201,7 +201,9 @@ static inline std::ofstream _openLogFile() {
 	std::ofstream outfile;
 	
 	if (!std::filesystem::exists("segfault.log")) {
-		std::cerr << "SegfaultHandler: The exception won't be logged into a file, unless 'segfault.log' exists." << std::endl;
+		std::cerr
+			<< "SegfaultHandler: The exception won't be logged into a file"
+			<< ", unless 'segfault.log' exists." << std::endl;
 		return outfile;
 	}
 	
