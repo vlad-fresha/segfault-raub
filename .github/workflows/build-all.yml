@@ -73,16 +73,10 @@ jobs:
 
       - name: Zip Files
         id: zip-files
-        run:
-        - node action-zip >> $GITHUB_OUTPUT
-        - ls
-          # node action-zip >> $GITHUB_OUTPUT
-
-      # - name: Show Zip Name
-      #   run: echo ${{ steps.package-version.outputs.version }}
-
-      # - name: Show Zip Name
-      #   run: node action-zip
+        run: node action-zip >> $GITHUB_OUTPUT
+        
+      - name: Zip Files ls
+        run: ls
 
       - name: Store Binaries
         uses: softprops/action-gh-release@v1
