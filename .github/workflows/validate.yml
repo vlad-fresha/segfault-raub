@@ -59,6 +59,9 @@ jobs:
       - name: Install Modules
         run: npm ci --ignore-scripts
 
+      - name: Remove bin
+        run: rm -rf bin-*
+
       - name: Build Current Binary
         run: npm run build-all
 
