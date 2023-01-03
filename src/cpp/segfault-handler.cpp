@@ -255,7 +255,7 @@ static inline void _closeLogFile(std::ofstream &outfile) {
 }
 
 
-EXPORT SEGFAULT_HANDLER {
+DBG_EXPORT SEGFAULT_HANDLER {
 	auto signalAndAdress = _getSignalAndAddress(info);
 	uint32_t signalId = signalAndAdress.first;
 	uint64_t address = signalAndAdress.second;
@@ -277,38 +277,38 @@ EXPORT SEGFAULT_HANDLER {
 
 
 // create some stack frames to inspect from CauseSegfault
-EXPORT NO_INLINE void _segfaultStackFrame1() {
+DBG_EXPORT NO_INLINE void _segfaultStackFrame1() {
 	int *foo = reinterpret_cast<int*>(1);
 	*foo = 42; // triggers a segfault exception
 }
 
-EXPORT NO_INLINE void _segfaultStackFrame2(void) {
+DBG_EXPORT NO_INLINE void _segfaultStackFrame2(void) {
 	void (*fn_ptr)() = _segfaultStackFrame1;
 	fn_ptr();
 }
 
 
-EXPORT JS_METHOD(causeSegfault) { NAPI_ENV;
+DBG_EXPORT JS_METHOD(causeSegfault) { NAPI_ENV;
 	std::cout << "SegfaultHandler: about to cause a segfault..." << std::endl;
 	void (*fn_ptr)() = _segfaultStackFrame2;
 	fn_ptr();
 	RET_UNDEFINED;
 }
 
-EXPORT NO_INLINE void _divideInt() {
+DBG_EXPORT NO_INLINE void _divideInt() {
 	volatile int a = 42;
 	volatile int b = 0;
 	a /= b;
 }
 
 
-EXPORT JS_METHOD(causeDivisionInt) { NAPI_ENV;
+DBG_EXPORT JS_METHOD(causeDivisionInt) { NAPI_ENV;
 	_divideInt();
 	RET_UNDEFINED;
 }
 
 
-EXPORT NO_INLINE void _overflowStack() {
+DBG_EXPORT NO_INLINE void _overflowStack() {
 	int foo[1000];
 	foo[999] = 1;
 	std::vector<int> empty = { foo[999] };
@@ -318,14 +318,14 @@ EXPORT NO_INLINE void _overflowStack() {
 	_overflowStack(); // infinite recursion
 }
 
-EXPORT JS_METHOD(causeOverflow) { NAPI_ENV;
+DBG_EXPORT JS_METHOD(causeOverflow) { NAPI_ENV;
 	std::cout << "SegfaultHandler: about to overflow the stack..." << std::endl;
 	_overflowStack();
 	RET_UNDEFINED;
 }
 
 
-EXPORT JS_METHOD(causeIllegal) { NAPI_ENV;
+DBG_EXPORT JS_METHOD(causeIllegal) { NAPI_ENV;
 	std::cout << "SegfaultHandler: about to raise an illegal operation..." << std::endl;
 #ifdef _WIN32
 	RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION, 0, 0, nullptr);
@@ -360,7 +360,7 @@ static inline void _disableSignal(uint32_t signalId) {
 }
 
 
-EXPORT JS_METHOD(setSignal) { NAPI_ENV;
+DBG_EXPORT JS_METHOD(setSignal) { NAPI_ENV;
 	if (IS_ARG_EMPTY(0)) {
 		RET_UNDEFINED;
 	}
@@ -388,7 +388,7 @@ EXPORT JS_METHOD(setSignal) { NAPI_ENV;
 }
 
 
-EXPORT void init() {
+DBG_EXPORT void init() {
 	// On Windows, a single handler is set on startup.
 	// On Unix, handlers for every signal are set on-demand.
 	#ifdef _WIN32

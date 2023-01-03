@@ -5,14 +5,14 @@
 
 
 namespace segfault {
-	EXPORT void init();
-	EXPORT void registerHandler();
+	DBG_EXPORT void init();
+	DBG_EXPORT void registerHandler();
 	
-	EXPORT JS_METHOD(causeSegfault);
-	EXPORT JS_METHOD(causeDivisionInt);
-	EXPORT JS_METHOD(causeOverflow);
-	EXPORT JS_METHOD(causeIllegal);
-	EXPORT JS_METHOD(setSignal);
+	DBG_EXPORT JS_METHOD(causeSegfault);
+	DBG_EXPORT JS_METHOD(causeDivisionInt);
+	DBG_EXPORT JS_METHOD(causeOverflow);
+	DBG_EXPORT JS_METHOD(causeIllegal);
+	DBG_EXPORT JS_METHOD(setSignal);
 }
 
 

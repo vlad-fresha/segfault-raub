@@ -538,7 +538,7 @@ static inline void _iterateFrames(std::ofstream &outfile) {
 }
 
 
-EXPORT void showCallstack(std::ofstream &outfile) {
+DBG_EXPORT void showCallstack(std::ofstream &outfile) {
 	PtrLibrary ptrDbgHelp = _loadDbgHelpDll();
 	if (!ptrDbgHelp.get()) {
 		return;

@@ -6,7 +6,7 @@
 
 
 namespace segfault {
-	EXPORT void showCallstack(std::ofstream &outfile);
+	DBG_EXPORT void showCallstack(std::ofstream &outfile);
 }
 
 #endif /* _STACK_WINDOWS_HPP_ */
