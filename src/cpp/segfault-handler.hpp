@@ -3,8 +3,6 @@
 
 #include <addon-tools.hpp>
 
-#include "bindings.hpp"
-
 
 namespace segfault {
 	EXPORT void init();

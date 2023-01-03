@@ -2,8 +2,7 @@
 #define _STACK_WINDOWS_HPP_
 
 #include <fstream>
-
-#include "bindings.hpp"
+#include <addon-tools.hpp>
 
 
 namespace segfault {
