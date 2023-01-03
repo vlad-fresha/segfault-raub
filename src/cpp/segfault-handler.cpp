@@ -183,17 +183,22 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 #ifdef _WIN32
 	showCallstack(outfile);
 #else
-	outfile.close();
 	void *array[32];
 	size_t size = backtrace(array, 32);
+	char **symbols = backtrace_symbols(array, size);
 	
-	constexpr int STDERR_FD = 2;
-	backtrace_symbols_fd(array, size, STDERR_FD);
+	if (outfile.is_open()) {
+		for (size_t i = 0; i < size; i++) {
+			outfile << symbols[i] << std::endl;
+			if (outfile.bad()) {
+				std::cerr << "SegfaultHandler: Error writing to file." << std::endl;
+				break;
+			}
+		}
+	}
 	
-	int fd = open("segfault.log", O_CREAT | O_APPEND | O_WRONLY, S_IRUSR | S_IRGRP | S_IROTH);
-	if (fd > 0) {
-		backtrace_symbols_fd(array, size, fd);
-		close(fd);
+	for (size_t i = 0; i < size; i++) {
+		std::cerr << symbols[i] << std::endl;
 	}
 #endif
 }
