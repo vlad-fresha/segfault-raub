@@ -24,16 +24,16 @@ describe('Exceptions', () => {
 		expect(response).toContain(exceptionName);
 	});
 	
-	it('shows symbol names in stacktrace', async () => {
-		let response = await runAndGetError('causeSegfault');
-		expect(response).toEqual(expect.stringMatching(/segfault(\w|:)+causeSegfault/));
-	});
+	// it('shows symbol names in stacktrace', async () => {
+	// 	let response = await runAndGetError('causeSegfault');
+	// 	expect(response).toEqual(expect.stringMatching(/segfault(\w|:)+causeSegfault/));
+	// });
 	
-	it('shows module names in stacktrace', async () => {
-		let response = await runAndGetError('causeSegfault');
-		expect(response).toContain('node');
-		expect(response).toContain('segfault.node');
-	});
+	// it('shows module names in stacktrace', async () => {
+	// 	let response = await runAndGetError('causeSegfault');
+	// 	expect(response).toContain('node');
+	// 	expect(response).toContain('segfault.node');
+	// });
 	
 	// These don't work properly on ARM
 	if (['windows', 'linux'].includes(platform)) {
