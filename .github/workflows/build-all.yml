@@ -74,8 +74,8 @@ jobs:
       - name: Zip Files
         id: zip-files
         run:
-          node action-zip
-          ls
+        - node action-zip >> $GITHUB_OUTPUT
+        - ls
           # node action-zip >> $GITHUB_OUTPUT
 
       # - name: Show Zip Name
