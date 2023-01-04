@@ -76,7 +76,7 @@ jobs:
 
       - name: Pack Files
         id: pack-files
-        run: node -p "require('addon-tools-raub').actionPack()" >> $GITHUB_OUTPUT
+        run: node -e "require('addon-tools-raub').actionPack()" >> $GITHUB_OUTPUT
 
       - name: Store Binaries
         uses: softprops/action-gh-release@v1
