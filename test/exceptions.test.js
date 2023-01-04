@@ -33,7 +33,7 @@ describe('Exceptions', () => {
 		
 		it('shows module names in stacktrace', async () => {
 			let response = await runAndGetError('causeSegfault');
-			expect(response).toContain('[node]');
+			expect(response).toContain('[node.exe]');
 			expect(response).toContain('[segfault.node]');
 		});
 	}
