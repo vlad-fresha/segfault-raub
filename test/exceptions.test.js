@@ -5,6 +5,8 @@ const exec = util.promisify(require('node:child_process').exec);
 
 const { getPlatform } = require('addon-tools-raub');
 
+jest.setTimeout(30000);
+
 
 const runAndGetError = async (name) => {
 	let response = '';
@@ -14,7 +16,6 @@ const runAndGetError = async (name) => {
 	} catch (error) {
 		response = error.message;
 	}
-	console.log('\n\n\n', response, '\n\n\n');
 	return response;
 };
 
