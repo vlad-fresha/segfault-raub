@@ -5,8 +5,6 @@ const exec = util.promisify(require('node:child_process').exec);
 
 const { getPlatform } = require('addon-tools-raub');
 
-jest.setTimeout(30000);
-
 
 const runAndGetError = async (name) => {
 	let response = '';
@@ -26,16 +24,19 @@ describe('Exceptions', () => {
 		expect(response).toContain(exceptionName);
 	});
 	
-	// it('shows symbol names in stacktrace', async () => {
-	// 	let response = await runAndGetError('causeSegfault');
-	// 	expect(response).toEqual(expect.stringMatching(/segfault(\w|:)+causeSegfault/));
-	// });
-	
-	// it('shows module names in stacktrace', async () => {
-	// 	let response = await runAndGetError('causeSegfault');
-	// 	expect(response).toContain('node');
-	// 	expect(response).toContain('segfault.node');
-	// });
+	// On Unix, the stacktrace is empty sometimes
+	if (['windows'].includes(getPlatform())) {
+		it('shows symbol names in stacktrace', async () => {
+			let response = await runAndGetError('causeSegfault');
+			expect(response).toEqual(expect.stringMatching(/segfault::causeSegfault/));
+		});
+		
+		it('shows module names in stacktrace', async () => {
+			let response = await runAndGetError('causeSegfault');
+			expect(response).toContain('[node]');
+			expect(response).toContain('[segfault.node]');
+		});
+	}
 	
 	// On ARM this fails
 	if (['windows', 'linux'].includes(getPlatform())) {
