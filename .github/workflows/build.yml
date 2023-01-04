@@ -1,4 +1,4 @@
-name: Build All
+name: Build Binaries
 defaults:
   run:
     shell: bash
@@ -30,7 +30,7 @@ jobs:
 
       - name: Get Package Version
         id: package-version
-        run: node action-version >> $GITHUB_OUTPUT
+        run: node -p "'version='+require('./package').version" >> $GITHUB_OUTPUT
 
       - name: Create Draft Release
         id: create_release
@@ -72,20 +72,11 @@ jobs:
 
       - name: Get Package Version
         id: package-version
-        run: node action-version >> $GITHUB_OUTPUT
+        run: node -p "'version='+require('./package').version" >> $GITHUB_OUTPUT
 
       - name: Zip Files
         id: zip-files
-        run: node action-zip >> $GITHUB_OUTPUT
-
-      - name: Zip Files ls
-        run: ls
-
-      - name: echo ver
-        run: echo "ver ${{ steps.package-version.outputs.version }}"
-
-      - name: echo zip
-        run: echo "zip ${{ steps.zip-files.outputs.zip }}"
+        run: node -p "require('addon-tools-raub').actionZip()" >> $GITHUB_OUTPUT
 
       - name: Store Binaries
         uses: softprops/action-gh-release@v1

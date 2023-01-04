@@ -1,6 +1,6 @@
 'use strict';
 
-const { platform } = require('addon-tools-raub');
+const { getPlatform } = require('addon-tools-raub');
 const Segfault = require('..');
 
 
@@ -46,7 +46,7 @@ describe('Segfault', () => {
 		expect(typeof Segfault.setSignal).toBe('function');
 	});
 	
-	(platform === 'windows' ? signalsWindows : signalsUnix).forEach((name) => {
+	(getPlatform() === 'windows' ? signalsWindows : signalsUnix).forEach((name) => {
 		it(`contains the \`${name}\` constant`, () => {
 			expect(typeof Segfault[name]).toBe('number');
 		});

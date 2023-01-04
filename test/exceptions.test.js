@@ -3,7 +3,7 @@
 const util = require('node:util');
 const exec = util.promisify(require('node:child_process').exec);
 
-const { platform } = require('addon-tools-raub');
+const { getPlatform } = require('addon-tools-raub');
 
 
 const runAndGetError = async (name) => {
@@ -14,13 +14,14 @@ const runAndGetError = async (name) => {
 	} catch (error) {
 		response = error.message;
 	}
+	console.log('\n\n\n', response, '\n\n\n');
 	return response;
 };
 
 describe('Exceptions', () => {
 	it('reports segfaults', async () => {
 		let response = await runAndGetError('causeSegfault');
-		const exceptionName = platform === 'windows' ? 'ACCESS_VIOLATION' : 'SIGSEGV';
+		const exceptionName = getPlatform() === 'windows' ? 'ACCESS_VIOLATION' : 'SIGSEGV';
 		expect(response).toContain(exceptionName);
 	});
 	
@@ -36,23 +37,23 @@ describe('Exceptions', () => {
 	// });
 	
 	// These don't work properly on ARM
-	if (['windows', 'linux'].includes(platform)) {
+	if (['windows', 'linux'].includes(getPlatform())) {
 		it('reports divisions by zero (int)', async () => {
 			let response = await runAndGetError('causeDivisionInt');
-			const exceptionName = platform === 'windows' ? 'INT_DIVIDE_BY_ZERO' : 'SIGFPE';
+			const exceptionName = getPlatform() === 'windows' ? 'INT_DIVIDE_BY_ZERO' : 'SIGFPE';
 			expect(response).toContain(exceptionName);
 		});
 		
 		it('reports stack overflows', async () => {
 			let response = await runAndGetError('causeOverflow');
-			const exceptionName = platform === 'windows' ? 'STACK_OVERFLOW' : 'SIGSEGV';
+			const exceptionName = getPlatform() === 'windows' ? 'STACK_OVERFLOW' : 'SIGSEGV';
 			expect(response).toContain(exceptionName);
 		});
 	}
 	
 	it('reports illegal operations', async () => {
 		let response = await runAndGetError('causeIllegal');
-		const exceptionName = platform === 'windows' ? 'ILLEGAL_INSTRUCTION' : 'SIGILL';
+		const exceptionName = getPlatform() === 'windows' ? 'ILLEGAL_INSTRUCTION' : 'SIGILL';
 		expect(response).toContain(exceptionName);
 	});
 });
