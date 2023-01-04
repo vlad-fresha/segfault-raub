@@ -74,9 +74,9 @@ jobs:
         id: package-version
         run: node -p "'version='+require('./package').version" >> $GITHUB_OUTPUT
 
-      - name: Zip Files
-        id: zip-files
-        run: node -p "require('addon-tools-raub').actionZip()" >> $GITHUB_OUTPUT
+      - name: Pack Files
+        id: pack-files
+        run: node -p "require('addon-tools-raub').actionPack()" >> $GITHUB_OUTPUT
 
       - name: Store Binaries
         uses: softprops/action-gh-release@v1
@@ -86,4 +86,4 @@ jobs:
           draft: true
           tag_name: ${{ steps.package-version.outputs.version }}
           name: Release ${{ steps.package-version.outputs.version }}
-          files: ${{ steps.zip-files.outputs.zip }}
+          files: ${{ steps.pack-files.outputs.pack }}

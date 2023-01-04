@@ -35,23 +35,6 @@
 		"test-ci": "jest --ci --runInBand --coverage=false --forceExit --detectOpenHandles",
 		"test-coverage": "rm -rf doc/jest && jest --coverage --silent"
 	},
-	"jest": {
-		"moduleFileExtensions": [
-			"js",
-			"node"
-		],
-		"testMatch": [
-			"**/*.test.js"
-		],
-		"coverageDirectory": "doc/jest",
-		"coverageReporters": [
-			"lcov"
-		],
-		"collectCoverageFrom": [
-			"**/*.js",
-			"!**/*.test.js"
-		]
-	},
 	"engines": {
 		"node": ">=18.12.1",
 		"npm": ">=8.19.2"
