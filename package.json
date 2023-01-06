@@ -18,11 +18,11 @@
 		"gyp"
 	],
 	"files": [
-		"include",
 		"index.js",
 		"index.d.ts",
 		"install.js",
 		"LICENSE",
+		"LICENSE_node-segfault-handler",
 		"package.json",
 		"README.md"
 	],
