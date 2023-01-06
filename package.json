@@ -31,9 +31,9 @@
 		"eslint": "eslint .",
 		"build-all": "cd src && node-gyp rebuild -j max --silent && node -e \"require('addon-tools-raub').cpbin('segfault')\" && cd ..",
 		"build-only": "cd src && node-gyp build -j max --silent && node -e \"require('addon-tools-raub').cpbin('segfault')\" && cd ..",
-		"test": "jest --coverage=false --watch",
-		"test-ci": "jest --ci --runInBand --coverage=false --forceExit --detectOpenHandles",
-		"test-coverage": "rm -rf doc/jest && jest --coverage --silent"
+		"test": "jest --coverage=false --watch --config=conf/jest.json",
+		"test-ci": "jest --ci --runInBand --coverage=false --forceExit --detectOpenHandles --config=conf/jest.json",
+		"test-coverage": "rm -rf doc/jest && jest --coverage --silent --config=conf/jest.json"
 	},
 	"engines": {
 		"node": ">=18.12.1",
@@ -44,7 +44,7 @@
 		"url": "https://github.com/node-3d/segfault-raub.git"
 	},
 	"dependencies": {
-		"addon-tools-raub": "https://github.com/node-3d/addon-tools-raub.git"
+		"addon-tools-raub": "^7.0.0"
 	},
 	"devDependencies": {
 		"eslint-plugin-jest": "^27.2.0",
