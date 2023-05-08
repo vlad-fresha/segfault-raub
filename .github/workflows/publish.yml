@@ -21,7 +21,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.12.1
+          node-version: 18.16.0
           cache: 'npm'
 
       - name: Get Package Version
@@ -44,4 +44,3 @@ jobs:
           draft: true
           tag_name: ${{ steps.package-version.outputs.version }}
           name: Release ${{ steps.package-version.outputs.version }}
-          body: Published at ${{ github.sha }}

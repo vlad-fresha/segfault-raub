@@ -5,8 +5,7 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "${workspaceFolder}/node_modules/node-addon-api",
-                "${LocalAppData}/node-gyp/Cache/18.12.1/include/node",
-                "${LocalAppData}/node-gyp/Cache/16.17.0/include/node"
+                "${LocalAppData}/node-gyp/Cache/18.16.0/include/node"
             ],
             "defines": [],
             "windowsSdkVersion": "10.0.19041.0",
