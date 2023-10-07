@@ -23,7 +23,7 @@ describe('Exceptions', () => {
 	it('reports segfaults', async () => {
 		let response = await runAndGetError('causeSegfault');
 		const exceptionName = getPlatform() === 'windows' ? 'ACCESS_VIOLATION' : 'SIGSEGV';
-		assert.ok(response.has(exceptionName));
+		assert.ok(response.includes(exceptionName));
 	});
 	
 	// On Unix, the stacktrace is empty sometimes
@@ -35,8 +35,8 @@ describe('Exceptions', () => {
 		
 		it('shows module names in stacktrace', async () => {
 			let response = await runAndGetError('causeSegfault');
-			assert.ok(response.has('[node.exe]'));
-			assert.ok(response.has('[segfault.node]'));
+			assert.ok(response.includes('[node.exe]'));
+			assert.ok(response.includes('[segfault.node]'));
 		});
 	}
 	
@@ -45,7 +45,7 @@ describe('Exceptions', () => {
 		it('reports divisions by zero (int)', async () => {
 			let response = await runAndGetError('causeDivisionInt');
 			const exceptionName = getPlatform() === 'windows' ? 'INT_DIVIDE_BY_ZERO' : 'SIGFPE';
-			assert.ok(response.has(exceptionName));
+			assert.ok(response.includes(exceptionName));
 		});
 	}
 	
@@ -54,13 +54,13 @@ describe('Exceptions', () => {
 		it('reports stack overflows', async () => {
 			let response = await runAndGetError('causeOverflow');
 			const exceptionName = getPlatform() === 'windows' ? 'STACK_OVERFLOW' : 'SIGSEGV';
-			assert.ok(response.has(exceptionName));
+			assert.ok(response.includes(exceptionName));
 		});
 	}
 	
 	it('reports illegal operations', async () => {
 		let response = await runAndGetError('causeIllegal');
 		const exceptionName = getPlatform() === 'windows' ? 'ILLEGAL_INSTRUCTION' : 'SIGILL';
-		assert.ok(response.has(exceptionName));
+		assert.ok(response.includes(exceptionName));
 	});
 });

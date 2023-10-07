@@ -3,7 +3,8 @@
 This is a part of [Node3D](https://github.com/node-3d) project.
 
 [![NPM](https://badge.fury.io/js/segfault-raub.svg)](https://badge.fury.io/js/segfault-raub)
-[![CodeFactor](https://www.codefactor.io/repository/github/node-3d/segfault-raub/badge)](https://www.codefactor.io/repository/github/node-3d/segfault-raub)
+[![ESLint](https://github.com/node-3d/segfault-raub/actions/workflows/eslint.yml/badge.svg)](https://github.com/node-3d/segfault-raub/actions/workflows/eslint.yml)
+[![Test](https://github.com/node-3d/segfault-raub/actions/workflows/test.yml/badge.svg)](https://github.com/node-3d/segfault-raub/actions/workflows/test.yml)
 
 ```
 npm i -s segfault-raub
@@ -19,9 +20,6 @@ Whenever a signal is raised, the module prints a native stack trace (if possible
 Node.js versions. Addon binaries are precompiled and **there is no compilation**
 step during the `npm i` command.
 
-
-## Usage
-
 A zero-setup is available: just require the module and it comes pre-equipped with several
 signal listeners enabled by default.
 
@@ -32,8 +30,6 @@ require('segfault-raub');
 > Note: if your project tree contains multiple versions of this module, the first one imported
 will seize `global['segfault-raub']`. The rest of them will only re-export `global['segfault-raub']`
 and **WILL NOT** import their own **binaries**.
-
-A more detailed manual setup is available and explained below.
 
 
 ## Enabling Signals
