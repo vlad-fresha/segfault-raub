@@ -1,5 +1,8 @@
 'use strict';
 
+const assert = require('node:assert').strict;
+const { describe, it } = require('node:test');
+
 const { getPlatform } = require('addon-tools-raub');
 const Segfault = require('..');
 
@@ -27,28 +30,28 @@ const signalsUnix = [
 
 describe('Segfault', () => {
 	it('exports an object', () => {
-		expect(typeof Segfault).toBe('object');
+		assert.strictEqual(typeof Segfault, 'object');
 	});
 	
 	it('contains `causeSegfault` function', () => {
-		expect(typeof Segfault.causeSegfault).toBe('function');
+		assert.strictEqual(typeof Segfault.causeSegfault, 'function');
 	});
 	it('contains `causeDivisionInt` function', () => {
-		expect(typeof Segfault.causeDivisionInt).toBe('function');
+		assert.strictEqual(typeof Segfault.causeDivisionInt, 'function');
 	});
 	it('contains `causeOverflow` function', () => {
-		expect(typeof Segfault.causeOverflow).toBe('function');
+		assert.strictEqual(typeof Segfault.causeOverflow, 'function');
 	});
 	it('contains `causeIllegal` function', () => {
-		expect(typeof Segfault.causeIllegal).toBe('function');
+		assert.strictEqual(typeof Segfault.causeIllegal, 'function');
 	});
 	it('contains `setSignal` function', () => {
-		expect(typeof Segfault.setSignal).toBe('function');
+		assert.strictEqual(typeof Segfault.setSignal, 'function');
 	});
 	
 	(getPlatform() === 'windows' ? signalsWindows : signalsUnix).forEach((name) => {
 		it(`contains the \`${name}\` constant`, () => {
-			expect(typeof Segfault[name]).toBe('number');
+			assert.strictEqual(typeof Segfault[name], 'number');
 		});
 	});
 });

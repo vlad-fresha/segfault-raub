@@ -5,6 +5,5 @@
 .project
 node_modules/
 src/build/
-doc/jest/
 bin-*/
 *.log

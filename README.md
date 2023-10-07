@@ -6,7 +6,7 @@ This is a part of [Node3D](https://github.com/node-3d) project.
 [![CodeFactor](https://www.codefactor.io/repository/github/node-3d/segfault-raub/badge)](https://www.codefactor.io/repository/github/node-3d/segfault-raub)
 
 ```
-npm i segfault-raub
+npm i -s segfault-raub
 ```
 
 This module installs platform-specific **signal** listeners

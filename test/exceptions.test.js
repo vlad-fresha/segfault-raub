@@ -1,5 +1,7 @@
 'use strict';
 
+const assert = require('node:assert').strict;
+const { describe, it } = require('node:test');
 const util = require('node:util');
 const exec = util.promisify(require('node:child_process').exec);
 
@@ -21,20 +23,20 @@ describe('Exceptions', () => {
 	it('reports segfaults', async () => {
 		let response = await runAndGetError('causeSegfault');
 		const exceptionName = getPlatform() === 'windows' ? 'ACCESS_VIOLATION' : 'SIGSEGV';
-		expect(response).toContain(exceptionName);
+		assert.ok(response.has(exceptionName));
 	});
 	
 	// On Unix, the stacktrace is empty sometimes
 	if (['windows'].includes(getPlatform())) {
 		it('shows symbol names in stacktrace', async () => {
 			let response = await runAndGetError('causeSegfault');
-			expect(response).toEqual(expect.stringMatching(/segfault::causeSegfault/));
+			assert.match(response, /segfault::causeSegfault/);
 		});
 		
 		it('shows module names in stacktrace', async () => {
 			let response = await runAndGetError('causeSegfault');
-			expect(response).toContain('[node.exe]');
-			expect(response).toContain('[segfault.node]');
+			assert.ok(response.has('[node.exe]'));
+			assert.ok(response.has('[segfault.node]'));
 		});
 	}
 	
@@ -43,7 +45,7 @@ describe('Exceptions', () => {
 		it('reports divisions by zero (int)', async () => {
 			let response = await runAndGetError('causeDivisionInt');
 			const exceptionName = getPlatform() === 'windows' ? 'INT_DIVIDE_BY_ZERO' : 'SIGFPE';
-			expect(response).toContain(exceptionName);
+			assert.ok(response.has(exceptionName));
 		});
 	}
 	
@@ -52,13 +54,13 @@ describe('Exceptions', () => {
 		it('reports stack overflows', async () => {
 			let response = await runAndGetError('causeOverflow');
 			const exceptionName = getPlatform() === 'windows' ? 'STACK_OVERFLOW' : 'SIGSEGV';
-			expect(response).toContain(exceptionName);
+			assert.ok(response.has(exceptionName));
 		});
 	}
 	
 	it('reports illegal operations', async () => {
 		let response = await runAndGetError('causeIllegal');
 		const exceptionName = getPlatform() === 'windows' ? 'ILLEGAL_INSTRUCTION' : 'SIGILL';
-		expect(response).toContain(exceptionName);
+		assert.ok(response.has(exceptionName));
 	});
 });
