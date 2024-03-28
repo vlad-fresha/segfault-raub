@@ -47,6 +47,8 @@ time_t timeInfo;
 
 const std::map<uint32_t, std::string> signalNames = {
 #ifdef _WIN32
+#define EXCEPTION_ALL 0x0
+	{ EXCEPTION_ALL, "CAPTURE ALL THE EXCEPTIONS" },
 	{ EXCEPTION_ACCESS_VIOLATION, "ACCESS_VIOLATION" },
 	{ EXCEPTION_DATATYPE_MISALIGNMENT, "DATATYPE_MISALIGNMENT" },
 	{ EXCEPTION_BREAKPOINT, "BREAKPOINT" },
@@ -69,6 +71,8 @@ const std::map<uint32_t, std::string> signalNames = {
 	{ EXCEPTION_INVALID_DISPOSITION, "INVALID_DISPOSITION" },
 	{ EXCEPTION_GUARD_PAGE, "GUARD_PAGE" },
 	{ EXCEPTION_INVALID_HANDLE, "INVALID_HANDLE" },
+	{ STATUS_STACK_BUFFER_OVERRUN, "STACK_BUFFER_OVERRUN" },
+//	{ EXCEPTION_POSSIBLE_DEADLOCK, "POSSIBLE_DEADLOCK" },
 #else
 	{ SIGABRT, "SIGABRT" },
 	{ SIGFPE, "SIGFPE" },
@@ -103,6 +107,7 @@ const std::map<uint32_t, std::string> signalNames = {
 
 std::map<uint32_t, bool> signalActivity = {
 #ifdef _WIN32
+	{ EXCEPTION_ALL, false },
 	{ EXCEPTION_ACCESS_VIOLATION, true },
 	{ EXCEPTION_ARRAY_BOUNDS_EXCEEDED, true },
 	{ EXCEPTION_FLT_DIVIDE_BY_ZERO, true },
@@ -125,6 +130,8 @@ std::map<uint32_t, bool> signalActivity = {
 	{ EXCEPTION_IN_PAGE_ERROR, false },
 	{ EXCEPTION_INVALID_DISPOSITION, false },
 	{ EXCEPTION_GUARD_PAGE, false },
+	{ STATUS_STACK_BUFFER_OVERRUN, false },
+//	{ EXCEPTION_POSSIBLE_DEADLOCK, false },
 #else
 	{ SIGABRT, true },
 	{ SIGFPE, true },
@@ -159,7 +166,7 @@ std::map<uint32_t, bool> signalActivity = {
 
 static inline bool _isSignalEnabled(uint32_t signalId) {
 #ifdef _WIN32
-	return (signalNames.count(signalId) && signalActivity.count(signalId) && signalActivity[signalId]);
+	return signalActivity[EXCEPTION_ALL] || (signalNames.count(signalId) && signalActivity.count(signalId) && signalActivity[signalId]);
 #else
 	return true;
 #endif
@@ -228,8 +235,14 @@ static inline void _writeTimeToFile(std::ofstream &outfile) {
 }
 
 static inline void _writeHeaderToOstream(std::ostream &stream, int pid, uint32_t signalId, uint64_t address) {
+	std::string signalName;
+	if (signalNames.count(signalId)) {
+		signalName = signalNames.at(signalId);
+	} else {
+		signalName = std::to_string(signalId);
+	}
 	stream
-		<< "\nPID " << pid << " received " << signalNames.at(signalId)
+		<< "\nPID " << pid << " received " << signalName
 		<< " for address: 0x" << std::hex << address << std::endl;
 }
 
