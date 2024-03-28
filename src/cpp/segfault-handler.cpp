@@ -366,7 +366,7 @@ DBG_EXPORT JS_METHOD(setSignal) { NAPI_ENV;
 	}
 	
 	LET_INT32_ARG(0, signalId);
-	LET_BOOL_ARG(0, value);
+	LET_BOOL_ARG(1, value);
 	
 	if (!signalNames.count(signalId)) {
 		RET_UNDEFINED;
