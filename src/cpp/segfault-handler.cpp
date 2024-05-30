@@ -166,7 +166,9 @@ std::map<uint32_t, bool> signalActivity = {
 
 static inline bool _isSignalEnabled(uint32_t signalId) {
 #ifdef _WIN32
-	return signalActivity[EXCEPTION_ALL] || (signalNames.count(signalId) && signalActivity.count(signalId) && signalActivity[signalId]);
+	return signalActivity[EXCEPTION_ALL] || (
+		signalNames.count(signalId) && signalActivity.count(signalId) && signalActivity[signalId]
+	);
 #else
 	return true;
 #endif
