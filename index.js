@@ -4,9 +4,10 @@
 if (global['segfault-raub']) {
 	module.exports = global['segfault-raub'];
 } else {
-	const { getBin } = require('addon-tools-raub');
-	
-	const core = require(`./${getBin()}/segfault`);
+	const core = require("pkg-prebuilds/bindings")(
+		__dirname,
+		require("./binding-options")
+	  );
 	
 	global['segfault-raub'] = core;
 	module.exports = core;

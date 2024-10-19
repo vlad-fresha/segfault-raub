@@ -1,6 +1,8 @@
 #ifndef _SEGFAULT_HANDLER_HPP_
 #define _SEGFAULT_HANDLER_HPP_
 
+#define NAPI_VERSION 9
+
 #include <addon-tools.hpp>
 
 

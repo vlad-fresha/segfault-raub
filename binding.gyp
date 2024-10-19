@@ -3,10 +3,10 @@
 		'arch': '<!(node -p "process.arch")',
 	},
 	'targets': [{
-		'target_name': 'segfault',
+		'target_name': 'julusian_segfault_handler',
 		'sources': [
-			'cpp/bindings.cpp',
-			'cpp/segfault-handler.cpp',
+			'src/cpp/bindings.cpp',
+			'src/cpp/segfault-handler.cpp',
 		],
 		'include_dirs': [
 			'<!@(node -p "require(\'addon-tools-raub\').getInclude()")',

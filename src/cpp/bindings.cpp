@@ -138,4 +138,4 @@ Napi::Object initModule(Napi::Env env, Napi::Object exports) {
 }
 
 
-NODE_API_MODULE(segfault, initModule)
+NODE_API_MODULE(julusian_segfault_handler, initModule)

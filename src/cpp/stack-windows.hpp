@@ -1,6 +1,9 @@
 #ifndef _STACK_WINDOWS_HPP_
 #define _STACK_WINDOWS_HPP_
 
+#define NAPI_VERSION 9
+
+
 #include <fstream>
 #include <addon-tools.hpp>
 

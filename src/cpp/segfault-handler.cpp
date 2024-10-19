@@ -35,11 +35,13 @@ namespace segfault {
 	#define HANDLER_CANCEL return
 	#define HANDLER_DONE return
 	
-	char _altStackBytes[SIGSTKSZ];
+	size_t stackBytes = SIGSTKSZ;
+	char* _altStackBytes = new char[stackBytes];
+
 	stack_t _altStack = {
 		_altStackBytes,
 		0,
-		SIGSTKSZ,
+		stackBytes,
 	};
 #endif
 
