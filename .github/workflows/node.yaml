@@ -6,7 +6,7 @@ on:
     #   - v*
 
 env:
-  NAPI_VERSION: 7
+  NAPI_VERSION: 9
   BINDING_NAME: julusian_segfault_handler
   MACOSX_DEPLOYMENT_TARGET: "10.13"
 
