@@ -54,23 +54,23 @@ jobs:
           #   docker-arch: linux/arm/v7 # this doesn't exist!
           #   docker-image: node:20-buster
           # linux-musl
-          - os: ubuntu-latest
-            arch: x64
-            is-native: true
-            container: node:20-alpine3.20
-            libc: musl
+          # - os: ubuntu-latest # missing execinfo.h
+          #   arch: x64
+          #   is-native: true
+          #   container: node:20-alpine3.20
+          #   libc: musl
 
     steps:
       - name: Dependencies (rockylinux)
         if: contains(matrix.container, 'rockylinux')
         run: |
           curl -sL https://rpm.nodesource.com/setup_20.x | bash -
-          dnf install -y gcc-toolset-11-toolchain make git python3 nodejs fontconfig google-noto-sans-fonts
+          dnf install -y gcc-toolset-11-toolchain make git python3 nodejs
           corepack enable
           echo "/opt/rh/gcc-toolset-11/root/usr/bin" >> $GITHUB_PATH
       - name: Dependencies (Linux musl)
         if: contains(matrix.container, 'alpine')
-        run: apk add build-base git python3 font-noto bash --update-cache
+        run: apk add build-base git python3 bash --update-cache
 
       - uses: actions/checkout@v4
         with:
@@ -129,7 +129,7 @@ jobs:
             elif command -v yum &> /dev/null
             then
               curl -sL https://rpm.nodesource.com/setup_20.x | bash -
-              dnf install -y gcc-toolset-11-toolchain make git python3 nodejs fontconfig google-noto-sans-fonts
+              dnf install -y gcc-toolset-11-toolchain make git python3 nodejs
               export PATH=/opt/rh/gcc-toolset-11/root/usr/bin:$PATH
             fi
 
