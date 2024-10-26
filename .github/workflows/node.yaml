@@ -91,7 +91,7 @@ jobs:
           yarn
 
           if [ -n "${{ matrix.is-native }}" ]; then
-            yarn test
+            yarn test-ci
           fi
 
           yarn run rebuild --arch=${{ matrix.arch }}
@@ -142,7 +142,7 @@ jobs:
 
             yarn
             yarn # run twice to avoid issues with armv7 running out of memory
-            yarn test
+            yarn test-ci
             yarn pkg-prebuilds-copy --baseDir build/Release --source $BINDING_NAME.node --name=$BINDING_NAME --strip --napi_version=$NAPI_VERSION --arch=${{ matrix.arch }} --libc=${{ matrix.libc }}
 
       - name: Upload artifacts
