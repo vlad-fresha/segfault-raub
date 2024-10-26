@@ -30,7 +30,7 @@
 			}],
 			['OS=="win"', {
 				'defines': ['WIN32_LEAN_AND_MEAN', 'VC_EXTRALEAN', '_WIN32', '_HAS_EXCEPTIONS=0'],
-				'sources': ['cpp/stack-windows.cpp'],
+				'sources': ['src/cpp/stack-windows.cpp'],
 				'msvs_settings': {
 					'VCCLCompilerTool': {
 						'AdditionalOptions' : [
