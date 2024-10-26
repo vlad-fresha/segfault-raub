@@ -24,12 +24,9 @@ jobs:
           - os: windows-2022
             arch: x64
             is-native: true
-          - os: windows-2022
-            arch: ia32
-            is-native: false
-          - os: windows-2022
-            arch: arm64
-            is-native: false
+          # - os: windows-2022
+          #   arch: arm64
+          #   is-native: false
           # macos
           - os: macos-13
             arch: arm64
