@@ -48,11 +48,11 @@ jobs:
             is-native: false
             docker-arch: linux/arm64
             docker-image: rockylinux/rockylinux:8
-          - os: ubuntu-latest
-            arch: arm
-            is-native: false
-            docker-arch: linux/arm/v7
-            docker-image: node:20-buster
+          # - os: ubuntu-latest
+          #   arch: arm
+          #   is-native: false
+          #   docker-arch: linux/arm/v7 # this doesn't exist!
+          #   docker-image: node:20-buster
           # linux-musl
           - os: ubuntu-latest
             arch: x64
