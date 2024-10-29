@@ -1,6 +1,5 @@
 #include <map>
 #include <string>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <stdio.h>
@@ -23,6 +22,16 @@
 namespace segfault {
 
 char logFilePath[512] = "segfault.log";
+
+
+inline bool _checkExists(const char* name) {
+    if (FILE *file = fopen(name, "r")) {
+        fclose(file);
+        return true;
+    } else {
+        return false;
+    }
+}
 
 #ifdef _WIN32
 	constexpr auto GETPID = _getpid;
@@ -217,7 +226,7 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 static inline std::ofstream _openLogFile() {
 	std::ofstream outfile;
 	
-	if (!std::filesystem::exists(logFilePath)) {
+	if (!_checkExists(logFilePath)) {
 		std::cerr
 			<< "SegfaultHandler: The exception won't be logged into a file"
 			<< ", unless 'segfault.log' exists." << std::endl;
