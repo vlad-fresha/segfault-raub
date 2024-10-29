@@ -421,11 +421,11 @@ DBG_EXPORT JS_METHOD(setLogPath) { NAPI_ENV;
 	LET_STR_ARG(0, path);
 	
 	if (!path.length()) {
-		strcpy(logFilePath, "segfault.log");
+		snprintf(logFilePath, sizeof(logFilePath), "%s", "segfault.log");
 		RET_UNDEFINED;
 	}
 	
-	strcpy(logFilePath, path.c_str());
+	snprintf(logFilePath, sizeof(logFilePath), "%s", path.c_str());
 	RET_UNDEFINED;
 }
 
