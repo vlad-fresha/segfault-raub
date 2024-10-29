@@ -23,7 +23,7 @@ step during the `npm i` command.
 A zero-setup is available: just require the module and it comes pre-equipped with several
 signal listeners enabled by default.
 
-```javascript
+```js
 require('segfault-raub');
 ```
 
@@ -39,7 +39,7 @@ enabled/disabled manually:
 
 Example:
 
-```javascript
+```js
 const {
     setSignal,
     EXCEPTION_ACCESS_VIOLATION, SIGSEGV,
@@ -68,7 +68,7 @@ These are be helpful to see how the signals are reported and if the log files ar
 
 Example:
 
-```javascript
+```js
 const { causeSegfault } = require('segfault-raub');
 causeSegfault();
 ```
