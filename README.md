@@ -13,7 +13,8 @@ npm i -s segfault-raub
 This module installs platform-specific **signal** listeners
 (see `sigaction` for **Unix** and `SetUnhandledExceptionFilter` for **Windows**).
 Whenever a signal is raised, the module prints a native stack trace (if possible) to both
-**STDERR** and to the "**segfault.log**" file (if it exists). If there is no such file, it
+**STDERR** and to the "**segfault.log**" file (if it exists inside "working directory").
+If there is no such file, it
 **won't be created**, so it is up to you if the log-file is needed.
 
 > Note: this **addon uses N-API**, and therefore is ABI-compatible across different
@@ -31,8 +32,18 @@ require('segfault-raub');
 will seize `global['segfault-raub']`. The rest of them will only re-export `global['segfault-raub']`
 and **WILL NOT** import their own **binaries**.
 
+---
 
-## Enabling Signals
+If you want to use a custom location instead of "**segfault.log**", use
+
+```js
+require('segfault-raub').setLogPath("C:/my/log/file.txt");
+```
+
+See the [TypeScript declarations](/index.d.ts) with comments.
+
+
+## Configuring Signals
 
 As listed below, some signals (platform specific) are enabled by default. But they can be
 enabled/disabled manually:

@@ -1,24 +1,41 @@
 declare module "segfault-raub" {
 	/**
-	 * Produce a segfault
-	 * Issue an actual segfault, accessing some unavailable memory
-	*/
+	 * Produce a segfault.
+	 * 
+	 * Issue an actual segfault, accessing some unavailable memory.
+	 */
 	export const causeSegfault: () => void;
+	
 	/**
 	 * Divides an integer number by zero.
-	*/
+	 */
 	export const causeDivisionInt: () => void;
+	
 	/**
 	 * Overflows the program stack.
-	*/
+	 */
 	export const causeOverflow: () => void;
+	
 	/**
 	 * Executes an illegal instruction.
-	*/
+	 */
 	export const causeIllegal: () => void;
-
-	// enable / disable signal handlers
+	
+	/**
+	 * Enable / disable signal handlers.
+	 */
 	export const setSignal: (signalId: number | null, value: boolean) => void;
+	
+	/**
+	 * Change the path of "segfault.log" location.
+	 * 
+	 * E.g. you can set it to `"C:/my.log"` or whatever.
+	 * But you still have to create the file separately,
+	 * the addon won't do that automatically.
+	 * 
+	 * If `null` or `""` path passed - resets to "segfault.log".
+	 */
+	export const setLogPath: (path: string | null) => void;
 
 	// Windows OS constants:
 	export const EXCEPTION_ALL: number | null;
