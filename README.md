@@ -52,7 +52,8 @@ setSignal(SIGSEGV, false);
 setSignal(EXCEPTION_BREAKPOINT, true);
 setSignal(SIGTRAP, true);
 
-setSignal(EXCEPTION_ALL, true) // this enables capturing every signal.
+// This enables capturing every signal on Windows.
+setSignal(EXCEPTION_ALL, true);
 ```
 
 On **Windows**, all the **Unix** signals are `null`, and the opposite is true.
@@ -80,6 +81,7 @@ causeSegfault();
 
 | Signal                             | Enabled | Description                                        |
 | :---                               | :---:   | :---                                               |
+| EXCEPTION_ALL                      | no      | All of the below.                                  |
 | EXCEPTION_ACCESS_VIOLATION         | yes     | Memory access was denied.                          |
 | EXCEPTION_ARRAY_BOUNDS_EXCEEDED    | yes     | Array was accessed with an illegal index.          |
 | EXCEPTION_INT_DIVIDE_BY_ZERO       | yes     | Attempt to divide by an integer divisor of 0.      |

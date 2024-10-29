@@ -22,6 +22,8 @@
 
 namespace segfault {
 
+char logFilePath[512] = "segfault.log";
+
 #ifdef _WIN32
 	constexpr auto GETPID = _getpid;
 	#define SEGFAULT_HANDLER LONG CALLBACK handleSignal(PEXCEPTION_POINTERS info)
@@ -165,13 +167,17 @@ std::map<uint32_t, bool> signalActivity = {
 
 
 static inline bool _isSignalEnabled(uint32_t signalId) {
+	return (
 #ifdef _WIN32
-	return signalActivity[EXCEPTION_ALL] || (
-		signalNames.count(signalId) && signalActivity.count(signalId) && signalActivity[signalId]
-	);
+		signalActivity[EXCEPTION_ALL] || (
 #else
-	return true;
+		(
 #endif
+			signalNames.count(signalId) &&
+			signalActivity.count(signalId) &&
+			signalActivity[signalId]
+		)
+	);
 }
 
 
@@ -199,7 +205,7 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 	constexpr int STDERR_FD = 2;
 	backtrace_symbols_fd(array, size, STDERR_FD);
 	
-	int fd = open("segfault.log", O_CREAT | O_APPEND | O_WRONLY, S_IRUSR | S_IRGRP | S_IROTH);
+	int fd = open(logFilePath, O_CREAT | O_APPEND | O_WRONLY, S_IRUSR | S_IRGRP | S_IROTH);
 	if (fd > 0) {
 		backtrace_symbols_fd(array, size, fd);
 		close(fd);
@@ -211,14 +217,14 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 static inline std::ofstream _openLogFile() {
 	std::ofstream outfile;
 	
-	if (!std::filesystem::exists("segfault.log")) {
+	if (!std::filesystem::exists(logFilePath)) {
 		std::cerr
 			<< "SegfaultHandler: The exception won't be logged into a file"
 			<< ", unless 'segfault.log' exists." << std::endl;
 		return outfile;
 	}
 	
-	outfile.open("segfault.log", std::ofstream::app);
+	outfile.open(logFilePath, std::ofstream::app);
 	
 	return outfile;
 }
@@ -399,6 +405,18 @@ DBG_EXPORT JS_METHOD(setSignal) { NAPI_ENV;
 		_disableSignal(signalId);
 	}
 	
+	RET_UNDEFINED;
+}
+
+DBG_EXPORT JS_METHOD(setLogPath) { NAPI_ENV;
+	LET_STR_ARG(0, path);
+	
+	if (!path.length()) {
+		strcpy_s(logFilePath, "segfault.log");
+		RET_UNDEFINED;
+	}
+	
+	strcpy_s(logFilePath, path.c_str());
 	RET_UNDEFINED;
 }
 

@@ -4,14 +4,23 @@ declare module "segfault-raub" {
 	 * Issue an actual segfault, accessing some unavailable memory
 	*/
 	export const causeSegfault: () => void;
+	/**
+	 * Divides an integer number by zero.
+	*/
 	export const causeDivisionInt: () => void;
+	/**
+	 * Overflows the program stack.
+	*/
 	export const causeOverflow: () => void;
+	/**
+	 * Executes an illegal instruction.
+	*/
 	export const causeIllegal: () => void;
 
 	// enable / disable signal handlers
 	export const setSignal: (signalId: number | null, value: boolean) => void;
 
-	// windows constants
+	// Windows OS constants:
 	export const EXCEPTION_ALL: number | null;
 	export const EXCEPTION_ACCESS_VIOLATION: number | null;
 	export const EXCEPTION_DATATYPE_MISALIGNMENT: number | null;
@@ -37,7 +46,7 @@ declare module "segfault-raub" {
 	export const EXCEPTION_INVALID_HANDLE: number | null;
 	export const STATUS_STACK_BUFFER_OVERRUN: number | null;
 
-	// linux constants
+	// Linux/Unix OS constants
 	export const SIGABRT: number | null;
 	export const SIGFPE: number | null;
 	export const SIGSEGV: number | null;
