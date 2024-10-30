@@ -36,7 +36,7 @@ describe('Logging', async () => {
 		await rm(PATH_CUSTOM);
 	});
 	
-	it('does not write log if there is no file', async () => {
+	await it('does not write log if there is no file', async () => {
 		await causeSegfault();
 		
 		const isLogWritten = await exists(PATH_STD);

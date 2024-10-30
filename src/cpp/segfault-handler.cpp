@@ -26,15 +26,6 @@ constexpr int SIGSTKSZ_LOCAL = 1024 * 128;
 char logFilePath[512] = "segfault.log";
 time_t timeInfo;
 
-inline bool _checkExists(const char* name) {
-    if (FILE *file = fopen(name, "r")) {
-        fclose(file);
-        return true;
-    } else {
-        return false;
-    }
-}
-
 #ifdef _WIN32
 	constexpr auto GETPID = _getpid;
 	#define SEGFAULT_HANDLER LONG CALLBACK handleSignal(PEXCEPTION_POINTERS info)
@@ -174,6 +165,12 @@ std::map<uint32_t, bool> signalActivity = {
 };
 
 
+inline bool _checkFileExists(const char* path) {
+	std::ifstream infile(path);
+	return infile.good();
+}
+
+
 static inline bool _isSignalEnabled(uint32_t signalId) {
 	return (
 #ifdef _WIN32
@@ -206,6 +203,11 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 #ifdef _WIN32
 	showCallstack(outfile);
 #else
+	// Do not write stacktrace if the file is not there
+	if (!outfile.is_open()) {
+		return;
+	}
+	
 	outfile.close();
 	void *array[32];
 	size_t size = backtrace(array, 32);
@@ -225,7 +227,7 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 static inline std::ofstream _openLogFile() {
 	std::ofstream outfile;
 	
-	if (!_checkExists(logFilePath)) {
+	if (!_checkFileExists(logFilePath)) {
 		std::cerr
 			<< "SegfaultHandler: The exception won't be logged into a file"
 			<< ", unless 'segfault.log' exists." << std::endl;
