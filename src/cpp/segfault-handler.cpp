@@ -21,8 +21,10 @@
 
 namespace segfault {
 
-char logFilePath[512] = "segfault.log";
+constexpr int SIGSTKSZ_LOCAL = 1024 * 128;
 
+char logFilePath[512] = "segfault.log";
+time_t timeInfo;
 
 inline bool _checkExists(const char* name) {
     if (FILE *file = fopen(name, "r")) {
@@ -46,15 +48,13 @@ inline bool _checkExists(const char* name) {
 	#define HANDLER_CANCEL return
 	#define HANDLER_DONE return
 	
-	char _altStackBytes[SIGSTKSZ];
+	char _altStackBytes[SIGSTKSZ_LOCAL];
 	stack_t _altStack = {
 		_altStackBytes,
 		0,
-		SIGSTKSZ,
+		SIGSTKSZ_LOCAL,
 	};
 #endif
-
-time_t timeInfo;
 
 const std::map<uint32_t, std::string> signalNames = {
 #ifdef _WIN32
@@ -114,7 +114,6 @@ const std::map<uint32_t, std::string> signalNames = {
 	{ SIGXFSZ, "SIGXFSZ" },
 #endif
 };
-
 
 std::map<uint32_t, bool> signalActivity = {
 #ifdef _WIN32
