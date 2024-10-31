@@ -23,8 +23,7 @@
 		"install.js",
 		"LICENSE",
 		"LICENSE_node-segfault-handler",
-		"package.json",
-		"README.md"
+		"package.json"
 	],
 	"scripts": {
 		"postinstall": "node install",

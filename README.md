@@ -10,10 +10,11 @@ This is a part of [Node3D](https://github.com/node-3d) project.
 npm i -s segfault-raub
 ```
 
-This module installs platform-specific **signal** listeners
-(see `sigaction` for **Unix** and `SetUnhandledExceptionFilter` for **Windows**).
-Whenever a signal is raised, the module prints a native stack trace (if possible) to both
-**STDERR** and to the "**segfault.log**" file (if it exists inside "working directory").
+This module report debug information on process crash (and some other events).
+It doesn't affect the performance while the program is running normally.
+
+The module prints to both
+**STDERR** and to the **"segfault.log"** file (if it exists inside **"working directory"**).
 If there is no such file, it
 **won't be created**, so it is up to you if the log-file is needed.
 
@@ -34,11 +35,13 @@ and **WILL NOT** import their own **binaries**.
 
 ---
 
-If you want to use a custom location instead of "**segfault.log**", use
+If you want to use a custom location instead of "**segfault.log**", use:
 
 ```js
 require('segfault-raub').setLogPath("C:/my/log/file.txt");
 ```
+
+**You must create this file first, it must be there when the crash happens.**
 
 See the [TypeScript declarations](/index.d.ts) with comments.
 
