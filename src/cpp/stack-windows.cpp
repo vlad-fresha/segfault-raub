@@ -1,7 +1,6 @@
 #include <tchar.h>
 #include <iostream>
 #include <sstream>
-#include <vector>
 #include <string>
 #include <windows.h>
 #include <dbghelp.h>
@@ -31,7 +30,7 @@ char bufBaseName[SIZE_BUF_NAME];
 char bufSymbolPath[SIZE_BUF_NAME];
 char bufDbgToolPath[SIZE_BUF_NAME];
 
-const std::vector<std::string> toolDllNames = { "kernel32.dll", "tlhelp32.dll" };
+const char *toolDllNames[] = { "kernel32.dll", "tlhelp32.dll" };
 
 struct IMAGEHLP_SYMBOL64_EXT : SYMBOL_INFO {
 	char __ext[SIZE_BUF_NAME];
@@ -236,7 +235,7 @@ static inline bool _loadModulesWithTh32(HANDLE hProcess, DWORD pid) {
 	me.dwSize = sizeof(me);
 	
 	for (auto name : toolDllNames) {
-		PtrLibrary ptrToolHelp = _makePtrModule(name.c_str());
+		PtrLibrary ptrToolHelp = _makePtrModule(name);
 		if (!ptrToolHelp.get()) {
 			continue;
 		}
