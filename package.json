@@ -1,7 +1,7 @@
 {
 	"author": "Luis Blanco <luisblanco1337@gmail.com>",
 	"name": "@julusian/segfault-raub",
-	"version": "2.3.1",
+	"version": "2.3.2",
 	"description": "Catches SIGSEGV and prints diagnostic information",
 	"main": "index.js",
 	"license": "MIT, BSD-3-Clause, BSD-2-Clause",
