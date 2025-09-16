@@ -25,7 +25,9 @@
 		"package.json",
 		"README.md",
 		"binding-options.js",
-		"prebuilds"
+		"prebuilds",
+		"binding.gyp",
+		"src"
 	],
 	"scripts": {
 		"install": "pkg-prebuilds-verify ./binding-options.js || node-gyp rebuild",
