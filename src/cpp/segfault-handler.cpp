@@ -64,7 +64,7 @@ bool useJsonOutput = false;
 	stack_t _altStack = {
 		_altStackBytes,
 		0,
-		stackBytes,
+		static_cast<size_t>(stackBytes),
 	};
 #endif
 
@@ -582,7 +582,10 @@ DBG_EXPORT bool getJsonOutputMode() {
 // create some stack frames to inspect from CauseSegfault
 DBG_EXPORT NO_INLINE void _segfaultStackFrame1() {
 	int *foo = reinterpret_cast<int*>(1);
-	*foo = 42; // triggers a segfault exception
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+	*foo = 42; // triggers a segfault exception (intentional)
+#pragma GCC diagnostic pop
 }
 
 DBG_EXPORT NO_INLINE void _segfaultStackFrame2(void) {

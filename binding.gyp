@@ -22,8 +22,8 @@
 		'include_dirs': [
 			'<!@(node -p "require(\'addon-tools-raub\').getInclude()")',
 		],
-		'cflags_cc': ['-std=c++17', '-fno-exceptions'],
-		'cflags': ['-O0', '-funwind-tables', '-fno-exceptions'],
+		'cflags_cc': ['-std=c++17', '-fno-exceptions', '-Wall', '-Werror'],
+		'cflags': ['-O0', '-funwind-tables', '-fno-exceptions', '-Wall', '-Werror'],
 		'conditions': [
 			['OS=="linux"', {
 				'defines': ['__linux__'],
@@ -59,7 +59,7 @@
 				'msvs_settings': {
 					'VCCLCompilerTool': {
 						'AdditionalOptions' : [
-							'/GL', '/GF', '/EHa-s-c-', '/GS', '/Gy', '/GR-', '/std:c++17',
+							'/GL', '/GF', '/EHa-s-c-', '/GS', '/Gy', '/GR-', '/std:c++17', '/W4', '/WX',
 						],
 					},
 					'VCLinkerTool': {
