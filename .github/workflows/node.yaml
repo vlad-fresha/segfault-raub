@@ -40,7 +40,7 @@ jobs:
           sudo apt-get install -y libunwind-dev
 
       - name: Dependencies (Alpine Linux)
-        if: matrix.alpine-version
+        if: matrix.alpine-version && matrix.arch == 'amd64'
         run: |
           echo "=== Alpine Linux Dependency Installation ==="
           echo "Container: node:${{ matrix.node-version }}-alpine${{ matrix.alpine-version }}"
@@ -64,7 +64,7 @@ jobs:
         if: ${{ !matrix.alpine-version }}
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version || '20.x' }}
+          node-version: ${{ matrix.node-version == 20 && '20.19.4' || format('{0}.x', matrix.node-version) }}
 
       - name: rebuild
         if: ${{ !matrix.alpine-version || (matrix.alpine-version && matrix.arch == 'amd64') }}
@@ -183,7 +183,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ runner.os }}-${{ matrix.arch }}-${{ matrix.alpine-version && 'musl' || '' }}-prebuilds
+          name: ${{ runner.os }}-${{ matrix.arch }}-node${{ matrix.node-version }}-${{ matrix.alpine-version && 'musl' || 'glibc' }}-prebuilds
           path: prebuilds
           retention-days: 1
 
