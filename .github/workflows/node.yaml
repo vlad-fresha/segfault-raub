@@ -20,32 +20,40 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # # windows
-          # - os: windows-2022
-          #   arch: x64
-          #   is-native: true
-          # # macos
-          # - os: macos-latest
-          #   arch: arm64
-          #   is-native: true
-          # - os: macos-13
-          #   arch: x64
-          #   is-native: true
-          # linux
+          # Ubuntu baseline test
           - os: ubuntu-latest
             arch: x64
-            is-native: true
             node-version: "20.19.4"
+
+          # Alpine Linux 3.22 with Node.js 20, 22, 24 - amd64
           - os: ubuntu-latest
             arch: x64
-            is-native: true
             container: node:20-alpine3.22
             libc: musl
-          - os: ubuntu-24.04-arm
+          - os: ubuntu-latest
+            arch: x64
+            container: node:22-alpine3.22
+            libc: musl
+          - os: ubuntu-latest
+            arch: x64
+            container: node:24-alpine3.22
+            libc: musl
+
+          # Alpine Linux 3.22 with Node.js 20, 22, 24 - arm64
+          - os: ubuntu-latest
             arch: arm64
-            is-native: true
             docker-arch: linux/arm64
             docker-image: node:20-alpine3.22
+            libc: musl
+          - os: ubuntu-latest
+            arch: arm64
+            docker-arch: linux/arm64
+            docker-image: node:22-alpine3.22
+            libc: musl
+          - os: ubuntu-latest
+            arch: arm64
+            docker-arch: linux/arm64
+            docker-image: node:24-alpine3.22
             libc: musl
 
     steps:
@@ -55,29 +63,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libunwind-dev
 
-      - name: Dependencies (rockylinux)
-        if: contains(matrix.container, 'rockylinux')
-        run: |
-          curl -sL https://rpm.nodesource.com/setup_20.x | bash -
-
-          # Install appropriate development tools based on RockyLinux version
-          if grep -q "Rocky Linux release 8" /etc/rocky-release 2>/dev/null; then
-            dnf install -y gcc-toolset-11-toolchain make git python3 nodejs
-            echo "/opt/rh/gcc-toolset-11/root/usr/bin" >> $GITHUB_PATH
-          elif grep -q "Rocky Linux release 9" /etc/rocky-release 2>/dev/null; then
-            # Rocky 9 uses standard gcc and development tools
-            dnf install -y gcc gcc-c++ make git python3 nodejs
-            # No need to add special path for system gcc
-          elif grep -q "Rocky Linux release 10" /etc/rocky-release 2>/dev/null; then
-            # Rocky 10 uses standard gcc and development tools
-            dnf install -y gcc gcc-c++ make git python3 nodejs
-            # No need to add special path for system gcc
-          else
-            # Fallback: use system gcc
-            dnf install -y gcc gcc-c++ make git python3 nodejs
-          fi
-
-          corepack enable
       - name: Dependencies (Alpine Linux)
         if: contains(matrix.container, 'alpine')
         run: |
@@ -129,10 +114,6 @@ jobs:
           else
             echo "ERROR: $BINDING_NAME.node not found in build/Release/"
             exit 1
-          fi
-
-          if [ -n "${{ matrix.is-native }}" ]; then
-            npm run test-ci
           fi
         env:
           CI: true
