@@ -1,8 +1,18 @@
 {
 	'variables': {
 		'arch': '<!(node -p "process.arch")',
-		'use_libunwind': '<!(if [ "$STACK_LIB" = "libunwind" ]; then echo "true"; elif pkg-config --exists libunwind 2>/dev/null; then echo "true"; else echo "false"; fi)',
 	},
+	'conditions': [
+		['OS=="win"', {
+			'variables': {
+				'use_libunwind': 'false',
+			},
+		}, {
+			'variables': {
+				'use_libunwind': '<!(if [ "$STACK_LIB" = "libunwind" ]; then echo "true"; elif pkg-config --exists libunwind 2>/dev/null; then echo "true"; else echo "false"; fi)',
+			},
+		}],
+	],
 	'targets': [{
 		'target_name': 'vlad_fresha_segfault_handler',
 		'sources': [
