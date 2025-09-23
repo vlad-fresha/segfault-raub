@@ -65,7 +65,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-${{ matrix.image }}-${{ matrix.stack-lib }}-prebuilds
+          name: ${{ matrix.os }}-${{ replace(replace(matrix.image, ':', '-'), '.', '-') }}-${{ matrix.stack-lib }}-prebuilds
           path: prebuilds
           retention-days: 1
 
