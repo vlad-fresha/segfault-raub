@@ -1,6 +1,6 @@
 {
 	"author": "Luis Blanco <luisblanco1337@gmail.com>",
-	"name": "@julusian/segfault-raub",
+	"name": "@vlad-fresha/segfault-raub",
 	"version": "2.3.2",
 	"description": "Catches SIGSEGV and prints diagnostic information",
 	"main": "index.js",
@@ -38,12 +38,12 @@
 		"test-ci": "node --test"
 	},
 	"engines": {
-		"node": ">=20.14.0",
-		"npm": ">=10.7.0"
+		"node": ">=20.3.0",
+		"npm": ">=10.8.2"
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/julusian/segfault-raub.git"
+		"url": "git+https://github.com/vlad-fresha/segfault-raub.git"
 	},
 	"dependencies": {
 		"node-gyp": "^11.4.2",
@@ -57,5 +57,5 @@
 		"node-addon-api": "^8.0.0",
 		"typescript": "^5.4.5"
 	},
-	"packageManager": "yarn@1.22.22+sha256.c17d3797fb9a9115bf375e31bfd30058cac6bc9c3b8807a3d8cb2094794b51ca"
+	"packageManager": "npm@10.8.2"
 }
