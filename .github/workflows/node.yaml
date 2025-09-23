@@ -8,8 +8,8 @@ env:
   BINDING_NAME: vlad_fresha_segfault_handler
 
 jobs:
-  build-and-test:
-    name: Build ${{ matrix.image }} (${{ matrix.stack-lib }}) on ${{ matrix.os }}
+  test:
+    name: Test ${{ matrix.image }} (${{ matrix.stack-lib }}) on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -30,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run build & test in native container
+      - name: Build & test in native container
         shell: bash
         run: |
           docker run --rm -v ${{ github.workspace }}:/work \
@@ -45,12 +45,14 @@ jobs:
                 apk update
                 apk add build-base git python3 musl-dev linux-headers libunwind-dev libunwind-static
               else
-                # Debian-based
+                # Debian-based - always install basic deps plus specific stack unwinding library
                 apt-get update
+                apt-get install -y build-essential git python3 pkg-config
                 if [ '${{ matrix.stack-lib }}' = 'libunwind' ]; then
-                  apt-get install -y build-essential git python3 libunwind-dev pkg-config
+                  apt-get install -y libunwind-dev
                 else
-                  apt-get install -y build-essential git python3 libc6-dev pkg-config
+                  # For glibc builds, ensure execinfo is available (usually built-in)
+                  apt-get install -y libc6-dev
                 fi
               fi
 
