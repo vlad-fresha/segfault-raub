@@ -60,13 +60,6 @@ jobs:
               npm run test-ci
             "
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.os }}-${{ matrix.image }}-${{ matrix.stack-lib }}-prebuilds
-          path: prebuilds
-          retention-days: 1
-
   test-native:
     name: Test Node.js ${{ matrix.node }} on ${{ matrix.os }} ${{ matrix.arch }}
     needs: test-linux
