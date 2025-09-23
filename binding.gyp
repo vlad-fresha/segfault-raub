@@ -9,7 +9,7 @@
 			},
 		}, {
 			'variables': {
-				'use_libunwind': '<!(if [ "$STACK_LIB" = "libunwind" ]; then echo "true"; elif pkg-config --exists libunwind 2>/dev/null; then echo "true"; else echo "false"; fi)',
+				'use_libunwind': '<!(if [ "$USE_LIBUNWIND" = "true" ] || [ "$USE_LIBUNWIND" = "1" ]; then echo "true"; elif [ "$USE_LIBUNWIND" = "false" ] || [ "$USE_LIBUNWIND" = "0" ]; then echo "false"; elif pkg-config --exists libunwind 2>/dev/null; then echo "true"; else echo "false"; fi)',
 			},
 		}],
 	],
