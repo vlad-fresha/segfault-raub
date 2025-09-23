@@ -9,7 +9,7 @@ env:
 
 jobs:
   build-and-test:
-    name: Build ${{ matrix.image }} on ${{ matrix.os }}
+    name: Build ${{ matrix.image }} (${{ matrix.stack-lib }}) on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -17,14 +17,18 @@ jobs:
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm]
         image: [node:20-alpine3.22, node:22-alpine3.22, node:24-alpine3.22, node:20, node:22, node:24]
+        stack-lib: [glibc, libunwind]
+        exclude:
+          # Alpine containers don't use glibc
+          - image: node:20-alpine3.22
+            stack-lib: glibc
+          - image: node:22-alpine3.22
+            stack-lib: glibc
+          - image: node:24-alpine3.22
+            stack-lib: glibc
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "${{ contains(matrix.image, 'node:20') && '20.x' || contains(matrix.image, 'node:22') && '22.x' || '24.x' }}"
 
       - name: Run build & test in native container
         shell: bash
@@ -35,15 +39,19 @@ jobs:
             sh -c "
               export ARCH=${{ matrix.os == 'ubuntu-24.04-arm' && 'arm64' || 'amd64' }}
 
-              # Install dependencies based on container type
+              # Install dependencies based on container type and stack library
               if command -v apk > /dev/null; then
-                # Alpine Linux
+                # Alpine Linux (always uses libunwind)
                 apk update
                 apk add build-base git python3 musl-dev linux-headers libunwind-dev libunwind-static
               else
                 # Debian-based
                 apt-get update
-                apt-get install -y build-essential git python3 libunwind-dev pkg-config
+                if [ '${{ matrix.stack-lib }}' = 'libunwind' ]; then
+                  apt-get install -y build-essential git python3 libunwind-dev pkg-config
+                else
+                  apt-get install -y build-essential git python3 libc6-dev pkg-config
+                fi
               fi
 
               cd /work
@@ -57,7 +65,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-${{ matrix.image }}-prebuilds
+          name: ${{ matrix.os }}-${{ matrix.image }}-${{ matrix.stack-lib }}-prebuilds
           path: prebuilds
           retention-days: 1
 
