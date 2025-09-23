@@ -27,6 +27,8 @@ Napi::Object initModule(Napi::Env env, Napi::Object exports) {
 	JS_SF_SET_METHOD(causeOverflow);
 	JS_SF_SET_METHOD(causeIllegal);
 	JS_SF_SET_METHOD(setSignal);
+	JS_SF_SET_METHOD(setOutputFormat);
+	JS_SF_SET_METHOD(getOutputFormat);
 	
 #ifdef _WIN32
 	JS_SF_CONSTANT(EXCEPTION_ACCESS_VIOLATION);

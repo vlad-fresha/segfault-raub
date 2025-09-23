@@ -27,6 +27,49 @@ signal listeners enabled by default.
 require('segfault-raub');
 ```
 
+## Output Formats
+
+The module supports both plain text and JSON output formats. By default, it uses plain text format. You can switch to JSON format for structured logging and easier parsing:
+
+```javascript
+const { setOutputFormat, getOutputFormat } = require('segfault-raub');
+
+// Check current format (returns false for plain text, true for JSON)
+console.log(getOutputFormat()); // false
+
+// Enable JSON output
+setOutputFormat(true);
+
+// Disable JSON output (back to plain text)
+setOutputFormat(false);
+```
+
+### JSON Output Example
+
+When JSON output is enabled, segfaults are reported in structured format:
+
+```json
+{
+  "type": "segfault",
+  "signal": 11,
+  "signal_name": "SIGSEGV",
+  "address": "0x0",
+  "pid": 12345,
+  "stack": [
+    {
+      "address": "0x7fff8b2a1234",
+      "function": "_segfaultStackFrame1()",
+      "module": "/path/to/your/app"
+    },
+    {
+      "address": "0x7fff8b2a5678",
+      "function": "main",
+      "module": "/path/to/your/app"
+    }
+  ]
+}
+```
+
 > Note: if your project tree contains multiple versions of this module, the first one imported
 will seize `global['segfault-raub']`. The rest of them will only re-export `global['segfault-raub']`
 and **WILL NOT** import their own **binaries**.
@@ -41,16 +84,38 @@ Example:
 
 ```javascript
 const {
-    setSignal,
+    setSignal, setOutputFormat,
     EXCEPTION_ACCESS_VIOLATION, SIGSEGV,
     EXCEPTION_BREAKPOINT, SIGTRAP,
 } = require('segfault-raub');
+
+// Enable JSON output for structured error reporting
+setOutputFormat(true);
 
 setSignal(EXCEPTION_ACCESS_VIOLATION, false);
 setSignal(SIGSEGV, false);
 
 setSignal(EXCEPTION_BREAKPOINT, true);
 setSignal(SIGTRAP, true);
+```
+
+When signals are triggered with JSON output enabled, they will be reported in structured format:
+
+```json
+{
+  "type": "segfault",
+  "signal": 5,
+  "signal_name": "SIGTRAP",
+  "address": "0x7fff8b2a1234",
+  "pid": 12345,
+  "stack": [
+    {
+      "address": "0x7fff8b2a1234",
+      "function": "main",
+      "module": "/path/to/your/app"
+    }
+  ]
+}
 ```
 
 On **Windows**, all the **Unix** signals are `null`, and the opposite is true.
@@ -71,6 +136,37 @@ Example:
 ```javascript
 const { causeSegfault } = require('segfault-raub');
 causeSegfault();
+```
+
+### JSON Output for Demo Methods
+
+You can also use JSON format with the demo methods for structured error reporting:
+
+```javascript
+const { causeSegfault, setOutputFormat } = require('segfault-raub');
+
+// Enable JSON output before triggering the segfault
+setOutputFormat(true);
+causeSegfault(); // Will output JSON formatted error
+```
+
+This will produce structured JSON output like:
+
+```json
+{
+  "type": "segfault",
+  "signal": 11,
+  "signal_name": "SIGSEGV",
+  "address": "0x0",
+  "pid": 12345,
+  "stack": [
+    {
+      "address": "0x7fff8b2a1234",
+      "function": "_segfaultStackFrame1()",
+      "module": "/path/to/your/app"
+    }
+  ]
+}
 ```
 
 
