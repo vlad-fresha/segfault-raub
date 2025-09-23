@@ -41,9 +41,9 @@ jobs:
               export ARCH=${{ matrix.os == 'ubuntu-24.04-arm' && 'arm64' || 'amd64' }}
 
               if command -v apk > /dev/null; then
-                apk add --no-cache build-base pkgconf git python3 musl-dev linux-headers libunwind-dev libunwind-static
+                apk add --no-cache build-base python3 libunwind-dev
               else
-                apt-get update && apt-get install -y build-essential git python3 pkg-confing
+                apt-get update && apt-get install -y build-essential python3
                 if [ '${{ matrix.stack-lib }}' = 'libunwind' ]; then
                   apt-get install -y libunwind-dev
                 else
