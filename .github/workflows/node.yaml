@@ -6,86 +6,49 @@ on:
 env:
   NAPI_VERSION: 9
   BINDING_NAME: vlad_fresha_segfault_handler
-  MACOSX_DEPLOYMENT_TARGET: "10.13"
 
 jobs:
   build-and-test:
-    name: Build ${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }} on ${{ contains(matrix.os, 'arm') && format('node:{0}-alpine3.22', matrix.node-version) || (matrix.os == 'ubuntu-latest' && matrix.node-version != 24) && format('node:{0}-alpine3.22', matrix.node-version) || format('{0} Node {1}', matrix.os, matrix.node-version) }}
+    name: Build ${{ format('node:{0}-alpine3.22', matrix.node-version) }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    container: ${{ (matrix.os == 'ubuntu-latest' && matrix.node-version != 24) && format('node:{0}-alpine3.22', matrix.node-version) || '' }}
-
+    container: ${{ format('node:{0}-alpine3.22', matrix.node-version) }}
+    
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm]
         node-version: [20, 22, 24]
-        exclude:
-          # Only one Ubuntu baseline test
-          - os: ubuntu-latest
-            node-version: 20
-          - os: ubuntu-latest
-            node-version: 22
 
     steps:
-      - name: Dependencies (Ubuntu)
-        if: ${{ !startsWith(job.container, 'node:') }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libunwind-dev
-
       - uses: actions/checkout@v4
 
       - name: Setup Node.js
-        if: ${{ !startsWith(job.container, 'node:') }}
         uses: actions/setup-node@v4
         with:
           node-version: "${{ matrix.node-version }}.x"
 
-      - name: Rebuild (Ubuntu/Alpine amd64)
-        if: ${{ matrix.os == 'ubuntu-latest' }}
+      - name: Run Alpine build & test in container on the native runner
         shell: bash
         run: |
-          npm install
-          npm run rebuild -- --arch=x64
-
-          # Create prebuilds structure manually for better reliability
-          mkdir -p "prebuilds/$BINDING_NAME-linux-x64/"
-          if [ -f "build/Release/$BINDING_NAME.node" ]; then
-            cp "build/Release/$BINDING_NAME.node" "prebuilds/$BINDING_NAME-linux-x64/node-napi-v$NAPI_VERSION.node"
-            echo "Copied $BINDING_NAME.node to prebuilds directory"
-          else
-            echo "ERROR: $BINDING_NAME.node not found in build/Release/"
-            exit 1
-          fi
-
-          npm run test-ci
-        env:
-          CI: true
-          npm_config_build_from_source: true
-
-      - name: Rebuild (Alpine arm64 in container)
-        if: ${{ matrix.os == 'ubuntu-24.04-arm' }}
-        shell: bash
-        run: |
-          # Run Alpine build in container on native ARM64 runner
           docker run --rm -v ${{ github.workspace }}:/work \
             -e CI=1 -e npm_config_build_from_source=1 -e NAPI_VERSION -e BINDING_NAME \
             node:${{ matrix.node-version }}-alpine3.22 \
             sh -c "
+              export ARCH=${{ matrix.os == 'ubuntu-24.04-arm' && 'arm64' || 'amd64' }}
               apk update
               apk add build-base git python3 bash musl-dev linux-headers libunwind-dev libunwind-static
               cd /work
               npm install
-              npm run rebuild -- --arch=arm64
-              mkdir -p prebuilds/$BINDING_NAME-linux-arm64/
-              cp build/Release/$BINDING_NAME.node prebuilds/$BINDING_NAME-linux-arm64/node-napi-v$NAPI_VERSION.node
+              npm run rebuild -- --arch=${ARCH}
+              mkdir -p prebuilds/$BINDING_NAME-linux-${ARCH}
+              cp build/Release/$BINDING_NAME.node prebuilds/$BINDING_NAME-linux-${ARCH}/node-napi-v$NAPI_VERSION.node
               npm run test-ci
             "
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ runner.os }}-${{ contains(matrix.os, 'arm') && 'arm64' || 'amd64' }}-node${{ matrix.node-version }}-${{ startsWith(job.container, 'node:') && 'musl' || 'glibc' }}-prebuilds
+          name: ${{ matrix.os }}-node${{ matrix.node-version }}-prebuilds
           path: prebuilds
           retention-days: 1
 
