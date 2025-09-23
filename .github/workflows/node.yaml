@@ -69,26 +69,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Windows
           - os: windows-2022
             arch: x64
-            node: '20.x'
-          - os: windows-2022
-            arch: x64
-            node: '22.x'
-          # macOS
+            node: '24.x'
           - os: macos-latest
             arch: arm64
-            node: '20.x'
-          - os: macos-latest
-            arch: arm64
-            node: '22.x'
+            node: '24.x'
           - os: macos-13
             arch: x64
-            node: '20.x'
-          - os: macos-13
-            arch: x64
-            node: '22.x'
+            node: '24.x'
 
     steps:
       - uses: actions/checkout@v4
