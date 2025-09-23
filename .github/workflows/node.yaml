@@ -34,7 +34,7 @@ jobs:
         shell: bash
         run: |
           docker run --rm -v ${{ github.workspace }}:/work \
-            -e CI=1 -e npm_config_build_from_source=1 -e NAPI_VERSION -e BINDING_NAME \
+            -e CI=1 -e npm_config_build_from_source=1 -e NAPI_VERSION -e BINDING_NAME -e STACK_LIB=${{ matrix.stack-lib }} \
             ${{ matrix.image }} \
             sh -c "
               export ARCH=${{ matrix.os == 'ubuntu-24.04-arm' && 'arm64' || 'amd64' }}

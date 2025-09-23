@@ -17,11 +17,22 @@
 			['OS=="linux"', {
 				'defines': ['__linux__'],
 				'conditions': [
-					['"<(arch)"=="x64"', {
-						'libraries': ['-lunwind', '-lunwind-x86_64'],
+					['environ["STACK_LIB"]=="libunwind"', {
+						'conditions': [
+							['"<(arch)"=="x64"', {
+								'libraries': ['-lunwind', '-lunwind-x86_64'],
+							}],
+							['"<(arch)"=="arm64"', {
+								'libraries': ['-lstdc++fs', '-lunwind', '-lunwind-aarch64'],
+							}],
+						],
 					}],
-					['"<(arch)"=="arm64"', {
-						'libraries': ['-lstdc++fs', '-lunwind', '-lunwind-aarch64'],
+					['environ["STACK_LIB"]!="libunwind"', {
+						'conditions': [
+							['"<(arch)"=="arm64"', {
+								'libraries': ['-lstdc++fs'],
+							}],
+						],
 					}],
 				],
 			}],
