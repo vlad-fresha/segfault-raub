@@ -12,63 +12,40 @@ env:
 
 jobs:
   build-and-test:
-    name: Build ${{ matrix.docker-arch || matrix.arch }} on ${{ matrix.docker-image || matrix.container || matrix.os }} ${{ matrix.libc }}
-    runs-on: ${{ matrix.os }}
-    container: ${{ matrix.container }}
+    name: Build ${{ matrix.config.docker-arch || matrix.config.arch }} on ${{ matrix.config.docker-image || matrix.config.container || matrix.config.os }} ${{ matrix.config.libc }}
+    runs-on: ${{ matrix.config.os }}
+    container: ${{ matrix.config.container }}
 
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # Ubuntu baseline test
-          - os: ubuntu-latest
-            arch: x64
-            node-version: "20.19.4"
+        config:
+          # Ubuntu baseline
+          - { os: ubuntu-latest, arch: x64, node-version: "20.19.4" }
 
-          # Alpine Linux 3.22 with Node.js 20, 22, 24 - amd64
-          - os: ubuntu-latest
-            arch: x64
-            container: node:20-alpine3.22
-            libc: musl
-          - os: ubuntu-latest
-            arch: x64
-            container: node:22-alpine3.22
-            libc: musl
-          - os: ubuntu-latest
-            arch: x64
-            container: node:24-alpine3.22
-            libc: musl
+          # Alpine 3.22 x64 tests
+          - { os: ubuntu-latest, arch: x64, node-version: 20, container: "node:20-alpine3.22", libc: musl }
+          - { os: ubuntu-latest, arch: x64, node-version: 22, container: "node:22-alpine3.22", libc: musl }
+          - { os: ubuntu-latest, arch: x64, node-version: 24, container: "node:24-alpine3.22", libc: musl }
 
-          # Alpine Linux 3.22 with Node.js 20, 22, 24 - arm64
-          - os: ubuntu-latest
-            arch: arm64
-            docker-arch: linux/arm64
-            docker-image: node:20-alpine3.22
-            libc: musl
-          - os: ubuntu-latest
-            arch: arm64
-            docker-arch: linux/arm64
-            docker-image: node:22-alpine3.22
-            libc: musl
-          - os: ubuntu-latest
-            arch: arm64
-            docker-arch: linux/arm64
-            docker-image: node:24-alpine3.22
-            libc: musl
+          # Alpine 3.22 arm64 tests
+          - { os: ubuntu-latest, arch: arm64, node-version: 20, docker-arch: "linux/arm64", docker-image: "node:20-alpine3.22", libc: musl }
+          - { os: ubuntu-latest, arch: arm64, node-version: 22, docker-arch: "linux/arm64", docker-image: "node:22-alpine3.22", libc: musl }
+          - { os: ubuntu-latest, arch: arm64, node-version: 24, docker-arch: "linux/arm64", docker-image: "node:24-alpine3.22", libc: musl }
 
     steps:
       - name: Dependencies (Ubuntu)
-        if: matrix.os == 'ubuntu-latest' && !matrix.container
+        if: matrix.config.os == 'ubuntu-latest' && !matrix.config.container
         run: |
           sudo apt-get update
           sudo apt-get install -y libunwind-dev
 
       - name: Dependencies (Alpine Linux)
-        if: contains(matrix.container, 'alpine')
+        if: contains(matrix.config.container, 'alpine')
         run: |
           echo "=== Alpine Linux Dependency Installation ==="
-          echo "Container: ${{ matrix.container }}"
-          echo "Architecture: ${{ matrix.arch }}"
+          echo "Container: ${{ matrix.config.container }}"
+          echo "Architecture: ${{ matrix.config.arch }}"
           apk update
           # Install essential build dependencies for Alpine/musl
           apk add build-base git python3 bash musl-dev linux-headers
@@ -85,17 +62,17 @@ jobs:
           submodules: recursive
 
       - name: Setup Node.js
-        if: ${{ !matrix.docker-arch && !matrix.container }}
+        if: ${{ !matrix.config.docker-arch && !matrix.config.container }}
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version || '20.x' }}
+          node-version: ${{ matrix.config.node-version || '20.x' }}
 
       - name: rebuild
-        if: ${{ !matrix.docker-arch }}
+        if: ${{ !matrix.config.docker-arch }}
         shell: bash
         run: |
           npm install
-          npm run rebuild -- --arch=${{ matrix.arch }}
+          npm run rebuild -- --arch=${{ matrix.config.arch }}
 
           # Create prebuilds structure manually for better reliability
           PLATFORM=""
@@ -107,9 +84,9 @@ jobs:
             PLATFORM="linux"
           fi
 
-          mkdir -p "prebuilds/$BINDING_NAME-$PLATFORM-${{ matrix.arch }}/"
+          mkdir -p "prebuilds/$BINDING_NAME-$PLATFORM-${{ matrix.config.arch }}/"
           if [ -f "build/Release/$BINDING_NAME.node" ]; then
-            cp "build/Release/$BINDING_NAME.node" "prebuilds/$BINDING_NAME-$PLATFORM-${{ matrix.arch }}/node-napi-v$NAPI_VERSION.node"
+            cp "build/Release/$BINDING_NAME.node" "prebuilds/$BINDING_NAME-$PLATFORM-${{ matrix.config.arch }}/node-napi-v$NAPI_VERSION.node"
             echo "Copied $BINDING_NAME.node to prebuilds directory"
           else
             echo "ERROR: $BINDING_NAME.node not found in build/Release/"
@@ -121,7 +98,7 @@ jobs:
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
-        if: ${{ matrix.docker-arch && env.dockerhub_username != '' }}
+        if: ${{ matrix.config.docker-arch && env.dockerhub_username != '' }}
         env:
           dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
         with:
@@ -129,17 +106,17 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-        if: matrix.docker-arch
+        if: matrix.config.docker-arch
       - name: Pre-fetch image
-        if: matrix.docker-arch
-        run: docker pull ${{ matrix.docker-image }} --platform=${{ matrix.docker-arch }}
+        if: matrix.config.docker-arch
+        run: docker pull ${{ matrix.config.docker-image }} --platform=${{ matrix.config.docker-arch }}
       - name: rebuild (in docker)
         uses: addnab/docker-run-action@v3
-        if: matrix.docker-arch
+        if: matrix.config.docker-arch
         with:
-          image: ${{ matrix.docker-image }}
+          image: ${{ matrix.config.docker-image }}
           # shell: bash
-          options: --platform=${{ matrix.docker-arch }} -v ${{ github.workspace }}:/work -e CI=1 -e npm_config_build_from_source=1 -e NAPI_VERSION -e BINDING_NAME
+          options: --platform=${{ matrix.config.docker-arch }} -v ${{ github.workspace }}:/work -e CI=1 -e npm_config_build_from_source=1 -e NAPI_VERSION -e BINDING_NAME
           run: |
             if command -v apt-get &> /dev/null
             then
@@ -180,15 +157,15 @@ jobs:
 
             npm install
             npm install # run twice to avoid issues with armv7 running out of memory
-            npm run rebuild -- --arch=${{ matrix.arch }}
+            npm run rebuild -- --arch=${{ matrix.config.arch }}
 
             # Debug: Check what was built
             ls -la build/Release/ || echo "No build/Release directory"
 
             # Create prebuilds structure manually if pkg-prebuilds-copy fails
-            mkdir -p prebuilds/$BINDING_NAME-linux-${{ matrix.arch }}/
+            mkdir -p prebuilds/$BINDING_NAME-linux-${{ matrix.config.arch }}/
             if [ -f "build/Release/$BINDING_NAME.node" ]; then
-              cp "build/Release/$BINDING_NAME.node" "prebuilds/$BINDING_NAME-linux-${{ matrix.arch }}/node-napi-v$NAPI_VERSION.node"
+              cp "build/Release/$BINDING_NAME.node" "prebuilds/$BINDING_NAME-linux-${{ matrix.config.arch }}/node-napi-v$NAPI_VERSION.node"
               echo "Copied $BINDING_NAME.node to prebuilds directory"
             else
               echo "ERROR: $BINDING_NAME.node not found in build/Release/"
@@ -203,7 +180,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ runner.os }}-${{ matrix.arch }}-${{ matrix.libc }}-prebuilds
+          name: ${{ runner.os }}-${{ matrix.config.arch }}-${{ matrix.config.libc }}-prebuilds
           path: prebuilds
           retention-days: 1
 
