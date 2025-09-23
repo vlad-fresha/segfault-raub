@@ -20,16 +20,16 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        # present version means we use Alpine Linux with musl, empty string - glibc
+        # present version means we use Alpine Linux with musl, empty string - vanilla ubuntu without container & glibc
         alpine-version: ['3.22', '']
         node-version: [20, 22, 24]
         arch: [amd64, arm64]
         exclude:
           # Only test one Ubuntu baseline (no Alpine)
           - alpine-version: ''
-            node-version: 22
+            node-version: 20
           - alpine-version: ''
-            node-version: 24
+            node-version: 22
           - alpine-version: ''
             arch: arm64
 
