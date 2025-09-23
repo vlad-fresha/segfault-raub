@@ -7,7 +7,7 @@ on:
 
 env:
   NAPI_VERSION: 9
-  BINDING_NAME: julusian_segfault_handler
+  BINDING_NAME: vlad_fresha_segfault_handler
   MACOSX_DEPLOYMENT_TARGET: "10.13"
 
 jobs:
@@ -24,13 +24,10 @@ jobs:
           - os: windows-2022
             arch: x64
             is-native: true
-          # - os: windows-2022
-          #   arch: arm64
-          #   is-native: false
           # macos
-          - os: macos-13
+          - os: macos-latest
             arch: arm64
-            is-native: false
+            is-native: true
           - os: macos-13
             arch: x64
             is-native: true
@@ -38,36 +35,65 @@ jobs:
           - os: ubuntu-latest
             arch: x64
             is-native: true
-            container: rockylinux/rockylinux:8
-          # linux-arm
+            node-version: "20.19.4"
+          - os: ubuntu-latest
+            arch: x64
+            is-native: true
+            container: node:20-alpine3.22
+            libc: musl
           - os: ubuntu-24.04-arm
             arch: arm64
             is-native: true
             docker-arch: linux/arm64
-            docker-image: rockylinux/rockylinux:8
-          # - os: ubuntu-latest
-          #   arch: arm
-          #   is-native: false
-          #   docker-arch: linux/arm/v7 # this doesn't exist!
-          #   docker-image: node:20-buster
-          # linux-musl
-          # - os: ubuntu-latest # missing execinfo.h
-          #   arch: x64
-          #   is-native: true
-          #   container: node:20-alpine3.20
-          #   libc: musl
+            docker-image: node:20-alpine3.22
+            libc: musl
 
     steps:
+      - name: Dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest' && !matrix.container
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libunwind-dev
+
       - name: Dependencies (rockylinux)
         if: contains(matrix.container, 'rockylinux')
         run: |
           curl -sL https://rpm.nodesource.com/setup_20.x | bash -
-          dnf install -y gcc-toolset-11-toolchain make git python3 nodejs
+
+          # Install appropriate development tools based on RockyLinux version
+          if grep -q "Rocky Linux release 8" /etc/rocky-release 2>/dev/null; then
+            dnf install -y gcc-toolset-11-toolchain make git python3 nodejs
+            echo "/opt/rh/gcc-toolset-11/root/usr/bin" >> $GITHUB_PATH
+          elif grep -q "Rocky Linux release 9" /etc/rocky-release 2>/dev/null; then
+            # Rocky 9 uses standard gcc and development tools
+            dnf install -y gcc gcc-c++ make git python3 nodejs
+            # No need to add special path for system gcc
+          elif grep -q "Rocky Linux release 10" /etc/rocky-release 2>/dev/null; then
+            # Rocky 10 uses standard gcc and development tools
+            dnf install -y gcc gcc-c++ make git python3 nodejs
+            # No need to add special path for system gcc
+          else
+            # Fallback: use system gcc
+            dnf install -y gcc gcc-c++ make git python3 nodejs
+          fi
+
           corepack enable
-          echo "/opt/rh/gcc-toolset-11/root/usr/bin" >> $GITHUB_PATH
-      - name: Dependencies (Linux musl)
+      - name: Dependencies (Alpine Linux)
         if: contains(matrix.container, 'alpine')
-        run: apk add build-base git python3 bash --update-cache
+        run: |
+          echo "=== Alpine Linux Dependency Installation ==="
+          echo "Container: ${{ matrix.container }}"
+          echo "Architecture: ${{ matrix.arch }}"
+          apk update
+          # Install essential build dependencies for Alpine/musl
+          apk add build-base git python3 bash musl-dev linux-headers
+          # Install libunwind for stack unwinding (better than execinfo on Alpine)
+          apk add libunwind-dev libunwind-static
+          # Verify libunwind installation
+          pkg-config --libs libunwind || echo "libunwind pkg-config not available"
+          ls -la /usr/lib/libunwind* 2>/dev/null || echo "libunwind libraries not found"
+          echo "Alpine Linux build environment ready with libunwind support"
+          echo "=== End Alpine Dependencies ==="
 
       - uses: actions/checkout@v4
         with:
@@ -83,16 +109,31 @@ jobs:
         if: ${{ !matrix.docker-arch }}
         shell: bash
         run: |
-          corepack enable
+          npm install
+          npm run rebuild -- --arch=${{ matrix.arch }}
 
-          yarn
-
-          if [ -n "${{ matrix.is-native }}" ]; then
-            yarn test-ci
+          # Create prebuilds structure manually for better reliability
+          PLATFORM=""
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            PLATFORM="win32"
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            PLATFORM="darwin"
+          else
+            PLATFORM="linux"
           fi
 
-          yarn run rebuild --arch=${{ matrix.arch }}
-          yarn pkg-prebuilds-copy --baseDir build/Release --source $BINDING_NAME.node --name=$BINDING_NAME --strip --napi_version=$NAPI_VERSION --arch=${{ matrix.arch }} --libc=${{ matrix.libc }}
+          mkdir -p "prebuilds/$BINDING_NAME-$PLATFORM-${{ matrix.arch }}/"
+          if [ -f "build/Release/$BINDING_NAME.node" ]; then
+            cp "build/Release/$BINDING_NAME.node" "prebuilds/$BINDING_NAME-$PLATFORM-${{ matrix.arch }}/node-napi-v$NAPI_VERSION.node"
+            echo "Copied $BINDING_NAME.node to prebuilds directory"
+          else
+            echo "ERROR: $BINDING_NAME.node not found in build/Release/"
+            exit 1
+          fi
+
+          if [ -n "${{ matrix.is-native }}" ]; then
+            npm run test-ci
+          fi
         env:
           CI: true
           npm_config_build_from_source: true
@@ -126,21 +167,57 @@ jobs:
             elif command -v yum &> /dev/null
             then
               curl -sL https://rpm.nodesource.com/setup_20.x | bash -
-              dnf install -y gcc-toolset-11-toolchain make git python3 nodejs
-              export PATH=/opt/rh/gcc-toolset-11/root/usr/bin:$PATH
+
+              # Install appropriate development tools for RockyLinux version
+              if grep -q "Rocky Linux release 8" /etc/rocky-release 2>/dev/null; then
+                dnf install -y gcc-toolset-11-toolchain make git python3 nodejs
+                export PATH=/opt/rh/gcc-toolset-11/root/usr/bin:$PATH
+              elif grep -q "Rocky Linux release 9" /etc/rocky-release 2>/dev/null; then
+                # Rocky 9 uses standard gcc and development tools
+                dnf install -y gcc gcc-c++ make git python3 nodejs
+                # No need to modify PATH for system gcc
+              elif grep -q "Rocky Linux release 10" /etc/rocky-release 2>/dev/null; then
+                # Rocky 10 uses standard gcc and development tools
+                dnf install -y gcc gcc-c++ make git python3 nodejs
+                # No need to modify PATH for system gcc
+              else
+                # Fallback: use system gcc
+                dnf install -y gcc gcc-c++ make git python3 nodejs
+              fi
+            elif command -v apk &> /dev/null
+            then
+              # Alpine Linux dependencies
+              apk update
+              apk add build-base git python3 bash musl-dev linux-headers libunwind-dev libunwind-static
+              # Verify libunwind installation
+              pkg-config --libs libunwind || echo "libunwind pkg-config not available"
+              ls -la /usr/lib/libunwind* 2>/dev/null || echo "libunwind libraries not found"
+              echo "Alpine Linux build environment ready with libunwind support"
             fi
 
             cd /work
 
-            corepack enable
+            npm install
+            npm install # run twice to avoid issues with armv7 running out of memory
+            npm run rebuild -- --arch=${{ matrix.arch }}
 
-            # try and avoid timeout errors
-            yarn config set httpTimeout 100000
+            # Debug: Check what was built
+            ls -la build/Release/ || echo "No build/Release directory"
 
-            yarn
-            yarn # run twice to avoid issues with armv7 running out of memory
-            yarn test-ci
-            yarn pkg-prebuilds-copy --baseDir build/Release --source $BINDING_NAME.node --name=$BINDING_NAME --strip --napi_version=$NAPI_VERSION --arch=${{ matrix.arch }} --libc=${{ matrix.libc }}
+            # Create prebuilds structure manually if pkg-prebuilds-copy fails
+            mkdir -p prebuilds/$BINDING_NAME-linux-${{ matrix.arch }}/
+            if [ -f "build/Release/$BINDING_NAME.node" ]; then
+              cp "build/Release/$BINDING_NAME.node" "prebuilds/$BINDING_NAME-linux-${{ matrix.arch }}/node-napi-v$NAPI_VERSION.node"
+              echo "Copied $BINDING_NAME.node to prebuilds directory"
+            else
+              echo "ERROR: $BINDING_NAME.node not found in build/Release/"
+              exit 1
+            fi
+
+            # Debug: Check prebuilds structure
+            find prebuilds -name "*.node" -ls || echo "No .node files in prebuilds"
+
+            npm run test-ci
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

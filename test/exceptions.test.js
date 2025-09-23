@@ -36,7 +36,7 @@ describe('Exceptions', () => {
 		it('shows module names in stacktrace', async () => {
 			let response = await runAndGetError('causeSegfault');
 			assert.ok(response.includes('[node.exe]'));
-			assert.ok(response.includes('[julusian_segfault_handler.node]'));
+			assert.ok(response.includes('[vlad_fresha_segfault_handler.node]'));
 		});
 	}
 	

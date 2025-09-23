@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <fcntl.h>
+#include <cstring>
 
 #ifdef _WIN32
 #include <io.h>
@@ -14,7 +15,25 @@
 #else
 #include <signal.h>
 #include <unistd.h>
-#include <execinfo.h>
+#ifdef __has_include
+  #if __has_include(<execinfo.h>)
+    #include <execinfo.h>
+    #define HAVE_EXECINFO_H 1
+    #define HAVE_LIBUNWIND_H 0
+  #elif __has_include(<libunwind.h>)
+    #include <libunwind.h>
+    #define HAVE_EXECINFO_H 0
+    #define HAVE_LIBUNWIND_H 1
+  #else
+    #define HAVE_EXECINFO_H 0
+    #define HAVE_LIBUNWIND_H 0
+  #endif
+#else
+  // Fallback for older compilers - try execinfo first
+  #include <execinfo.h>
+  #define HAVE_EXECINFO_H 1
+  #define HAVE_LIBUNWIND_H 0
+#endif
 #endif
 
 #include "segfault-handler.hpp"
@@ -195,17 +214,77 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 	showCallstack(outfile);
 #else
 	outfile.close();
+
+#if HAVE_EXECINFO_H
 	void *array[32];
 	size_t size = backtrace(array, 32);
-	
+
 	constexpr int STDERR_FD = 2;
 	backtrace_symbols_fd(array, size, STDERR_FD);
-	
+
 	int fd = open("segfault.log", O_CREAT | O_APPEND | O_WRONLY, S_IRUSR | S_IRGRP | S_IROTH);
 	if (fd > 0) {
 		backtrace_symbols_fd(array, size, fd);
 		close(fd);
 	}
+#elif HAVE_LIBUNWIND_H
+	// Use libunwind for stack unwinding (better for Alpine/musl)
+	unw_cursor_t cursor;
+	unw_context_t context;
+	unw_word_t ip, sp, off;
+	char symbol[256];
+	int frame = 0;
+	constexpr int STDERR_FD = 2;
+
+	unw_getcontext(&context);
+	unw_init_local(&cursor, &context);
+
+	const char* header = "Stack trace (libunwind):\n";
+	write(STDERR_FD, header, strlen(header));
+
+	int fd = open("segfault.log", O_CREAT | O_APPEND | O_WRONLY, S_IRUSR | S_IRGRP | S_IROTH);
+	if (fd > 0) {
+		write(fd, header, strlen(header));
+	}
+
+	while (unw_step(&cursor) > 0 && frame < 32) {
+		unw_get_reg(&cursor, UNW_REG_IP, &ip);
+		unw_get_reg(&cursor, UNW_REG_SP, &sp);
+
+		symbol[0] = '\0';
+		if (unw_get_proc_name(&cursor, symbol, sizeof(symbol), &off) == 0) {
+			char buffer[512];
+			int len = snprintf(buffer, sizeof(buffer), "%2d: 0x%lx <%s+0x%lx>\n", frame, ip, symbol, off);
+			write(STDERR_FD, buffer, len);
+			if (fd > 0) {
+				write(fd, buffer, len);
+			}
+		} else {
+			char buffer[256];
+			int len = snprintf(buffer, sizeof(buffer), "%2d: 0x%lx\n", frame, ip);
+			write(STDERR_FD, buffer, len);
+			if (fd > 0) {
+				write(fd, buffer, len);
+			}
+		}
+		frame++;
+	}
+
+	if (fd > 0) {
+		close(fd);
+	}
+#else
+	// Neither execinfo nor libunwind available
+	constexpr int STDERR_FD = 2;
+	const char* msg = "Stack trace not available (no unwinding library found)\n";
+	write(STDERR_FD, msg, strlen(msg));
+
+	int fd = open("segfault.log", O_CREAT | O_APPEND | O_WRONLY, S_IRUSR | S_IRGRP | S_IROTH);
+	if (fd > 0) {
+		write(fd, msg, strlen(msg));
+		close(fd);
+	}
+#endif
 #endif
 }
 

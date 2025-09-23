@@ -3,7 +3,7 @@
 		'arch': '<!(node -p "process.arch")',
 	},
 	'targets': [{
-		'target_name': 'julusian_segfault_handler',
+		'target_name': 'vlad_fresha_segfault_handler',
 		'sources': [
 			'src/cpp/bindings.cpp',
 			'src/cpp/segfault-handler.cpp',
@@ -17,8 +17,11 @@
 			['OS=="linux"', {
 				'defines': ['__linux__'],
 				'conditions': [
+					['"<(arch)"=="x64"', {
+						'libraries': ['-lunwind', '-lunwind-x86_64'],
+					}],
 					['"<(arch)"=="arm64"', {
-						'libraries': ['-lstdc++fs'],
+						'libraries': ['-lstdc++fs', '-lunwind', '-lunwind-aarch64'],
 					}],
 				],
 			}],

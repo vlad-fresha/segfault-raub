@@ -1,4 +1,4 @@
 module.exports = {
-  name: "julusian_segfault_handler",
+  name: "vlad_fresha_segfault_handler",
   napi_versions: [9],
 };
