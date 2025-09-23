@@ -11,13 +11,12 @@ jobs:
   build-and-test:
     name: Build ${{ matrix.image }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    container: ${{ matrix.image }}
 
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm]
-        image: [node:20-alpine3.22, node:22-alpine3.22, node:24-alpine3.22]
+        image: [node:20-alpine3.22, node:22-alpine3.22, node:24-alpine3.22, node:20, node:22, node:24]
 
     steps:
       - uses: actions/checkout@v4
@@ -27,7 +26,7 @@ jobs:
         with:
           node-version: "${{ contains(matrix.image, 'node:20') && '20.x' || contains(matrix.image, 'node:22') && '22.x' || '24.x' }}"
 
-      - name: Run Alpine build & test in container on the native runner
+      - name: Run build & test in native container
         shell: bash
         run: |
           docker run --rm -v ${{ github.workspace }}:/work \
@@ -35,8 +34,18 @@ jobs:
             ${{ matrix.image }} \
             sh -c "
               export ARCH=${{ matrix.os == 'ubuntu-24.04-arm' && 'arm64' || 'amd64' }}
-              apk update
-              apk add build-base git python3 musl-dev linux-headers libunwind-dev libunwind-static
+
+              # Install dependencies based on container type
+              if command -v apk > /dev/null; then
+                # Alpine Linux
+                apk update
+                apk add build-base git python3 musl-dev linux-headers libunwind-dev libunwind-static
+              else
+                # Debian-based
+                apt-get update
+                apt-get install -y build-essential git python3 libunwind-dev pkg-config
+              fi
+
               cd /work
               npm install
               npm run rebuild -- --arch=\${ARCH}
@@ -48,7 +57,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-${{ replace(replace(matrix.image, ':', '-'), '.', '-') }}-prebuilds
+          name: ${{ matrix.os }}-${{ matrix.image }}-prebuilds
           path: prebuilds
           retention-days: 1
 
