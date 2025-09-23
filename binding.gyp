@@ -17,7 +17,7 @@
 			['OS=="linux"', {
 				'defines': ['__linux__'],
 				'conditions': [
-					['environ["STACK_LIB"]=="libunwind"', {
+					['<!(echo ${STACK_LIB:-unknown})=="libunwind"', {
 						'conditions': [
 							['"<(arch)"=="x64"', {
 								'libraries': ['-lunwind', '-lunwind-x86_64'],
@@ -27,7 +27,7 @@
 							}],
 						],
 					}],
-					['environ["STACK_LIB"]!="libunwind"', {
+					['<!(echo ${STACK_LIB:-unknown})!="libunwind"', {
 						'conditions': [
 							['"<(arch)"=="arm64"', {
 								'libraries': ['-lstdc++fs'],
