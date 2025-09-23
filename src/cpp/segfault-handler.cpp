@@ -216,9 +216,19 @@ static inline std::pair<uint32_t, uint64_t> _getSignalAndAddress(siginfo_t *info
 static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address) {
 	constexpr int STDERR_FD = 2;
 
-	// Start JSON object
-	const char* json_start = "{\"type\":\"segfault\",\"signal\":";
+	// Get current time in ISO format
+	time_t now = time(0);
+	struct tm *utc_tm = gmtime(&now);
+	char timestamp[32];
+	strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%S.000Z", utc_tm);
+
+	// Start JSON object with timestamp and level
+	const char* json_start = "{\"time\":\"";
 	write(STDERR_FD, json_start, strlen(json_start));
+	write(STDERR_FD, timestamp, strlen(timestamp));
+
+	const char* level_part = "\",\"level\":\"ERROR\",\"type\":\"segfault\",\"signal\":";
+	write(STDERR_FD, level_part, strlen(level_part));
 
 	// Write signal ID
 	char signal_str[32];
@@ -237,6 +247,21 @@ static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address) {
 	}
 	write(STDERR_FD, signalName.c_str(), signalName.length());
 
+	// Write human-readable message
+	const char* msg_prefix = "\",\"message\":\"Process ";
+	write(STDERR_FD, msg_prefix, strlen(msg_prefix));
+
+	int pid = GETPID();
+	char pid_msg[16];
+	int pid_msg_len = snprintf(pid_msg, sizeof(pid_msg), "%d", pid);
+	write(STDERR_FD, pid_msg, pid_msg_len);
+
+	const char* msg_middle = " received ";
+	write(STDERR_FD, msg_middle, strlen(msg_middle));
+	write(STDERR_FD, signalName.c_str(), signalName.length());
+	const char* msg_end = " signal";
+	write(STDERR_FD, msg_end, strlen(msg_end));
+
 	// Write address
 	const char* addr_prefix = "\",\"address\":\"0x";
 	write(STDERR_FD, addr_prefix, strlen(addr_prefix));
@@ -248,11 +273,7 @@ static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address) {
 	// Write PID
 	const char* pid_prefix = "\",\"pid\":";
 	write(STDERR_FD, pid_prefix, strlen(pid_prefix));
-
-	int pid = GETPID();
-	char pid_str[32];
-	int pid_len = snprintf(pid_str, sizeof(pid_str), "%d", pid);
-	write(STDERR_FD, pid_str, pid_len);
+	write(STDERR_FD, pid_msg, pid_msg_len);
 
 	// Start stack trace array
 	const char* stack_prefix = ",\"stack\":[";
