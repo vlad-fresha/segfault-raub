@@ -65,7 +65,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-${{ replace(replace(matrix.image, ':', '-'), '.', '-') }}-${{ matrix.stack-lib }}-prebuilds
+          name: ${{ matrix.os }}-${{ contains(matrix.image, '20') && 'node20' || contains(matrix.image, '22') && 'node22' || 'node24' }}-${{ contains(matrix.image, 'alpine') && 'alpine' || 'debian' }}-${{ matrix.stack-lib }}-prebuilds
           path: prebuilds
           retention-days: 1
 
