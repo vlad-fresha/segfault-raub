@@ -6,9 +6,10 @@ on:
 env:
   NAPI_VERSION: 9
   BINDING_NAME: vlad_fresha_segfault_handler
+  MACOSX_DEPLOYMENT_TARGET: "10.13"
 
 jobs:
-  test:
+  test-linux:
     name: Test ${{ matrix.image }} (${{ matrix.stack-lib }}) on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
 
@@ -39,15 +40,10 @@ jobs:
             sh -c "
               export ARCH=${{ matrix.os == 'ubuntu-24.04-arm' && 'arm64' || 'amd64' }}
 
-              # Install dependencies based on container type and stack library
               if command -v apk > /dev/null; then
-                # Alpine Linux - install pkg-config and libunwind (pkg-config will detect it)
-                apk update
-                apk add build-base git python3 musl-dev linux-headers pkg-config libunwind-dev libunwind-static
+                apk add --no-cache git python3 musl-dev linux-headers pkgconf libunwind-dev libunwind-static
               else
-                # Debian-based - install deps based on matrix stack library choice
-                apt-get update
-                apt-get install -y build-essential git python3 pkg-config
+                apt-get update && apt-get install -y build-essential git python3 pkg-confing
                 if [ '${{ matrix.stack-lib }}' = 'libunwind' ]; then
                   apt-get install -y libunwind-dev
                 else
@@ -63,3 +59,84 @@ jobs:
               cp build/Release/$BINDING_NAME.node prebuilds/$BINDING_NAME-linux-\${ARCH}/node-napi-v$NAPI_VERSION.node
               npm run test-ci
             "
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-${{ matrix.image }}-${{ matrix.stack-lib }}-prebuilds
+          path: prebuilds
+          retention-days: 1
+
+  test-native:
+    name: Test Node.js ${{ matrix.node }} on ${{ matrix.os }} ${{ matrix.arch }}
+    needs: test-linux
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows
+          - os: windows-2022
+            arch: x64
+            node: '20.x'
+          - os: windows-2022
+            arch: x64
+            node: '22.x'
+          # macOS
+          - os: macos-latest
+            arch: arm64
+            node: '20.x'
+          - os: macos-latest
+            arch: arm64
+            node: '22.x'
+          - os: macos-13
+            arch: x64
+            node: '20.x'
+          - os: macos-13
+            arch: x64
+            node: '22.x'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # macOS typically uses built-in libunwind, no extra deps needed
+          echo "macOS using built-in libunwind"
+
+      - name: Build & Test
+        shell: bash
+        run: |
+          npm install
+          npm run rebuild -- --arch=${{ matrix.arch }}
+
+          # Create prebuilds directory structure
+          PLATFORM=""
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            PLATFORM="win32"
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            PLATFORM="darwin"
+          else
+            PLATFORM="linux"
+          fi
+
+          mkdir -p "prebuilds/$BINDING_NAME-$PLATFORM-${{ matrix.arch }}"
+          if [ -f "build/Release/$BINDING_NAME.node" ]; then
+            cp "build/Release/$BINDING_NAME.node" "prebuilds/$BINDING_NAME-$PLATFORM-${{ matrix.arch }}/node-napi-v$NAPI_VERSION.node"
+            echo "Copied $BINDING_NAME.node to prebuilds directory"
+          else
+            echo "ERROR: $BINDING_NAME.node not found in build/Release/"
+            exit 1
+          fi
+
+          npm run test-ci
+        env:
+          CI: true
+          npm_config_build_from_source: true
