@@ -589,10 +589,14 @@ DBG_EXPORT bool getJsonOutputMode() {
 // create some stack frames to inspect from CauseSegfault
 DBG_EXPORT NO_INLINE void _segfaultStackFrame1() {
 	int *foo = reinterpret_cast<int*>(1);
+#ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Warray-bounds"
+#endif
 	*foo = 42; // triggers a segfault exception (intentional)
+#ifdef __GNUC__
 #pragma GCC diagnostic pop
+#endif
 }
 
 DBG_EXPORT NO_INLINE void _segfaultStackFrame2(void) {
