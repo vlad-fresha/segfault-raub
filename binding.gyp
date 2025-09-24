@@ -22,8 +22,8 @@
 		'include_dirs': [
 			'<!@(node -p "require(\'addon-tools-raub\').getInclude()")',
 		],
-		'cflags_cc': ['-std=c++17', '-fno-exceptions', '-Wall', '-Werror', '-Wno-deprecated-volatile'],
-		'cflags': ['-O0', '-funwind-tables', '-fno-exceptions', '-Wall', '-Werror', '-Wno-deprecated-volatile'],
+		'cflags_cc': ['-std=c++17', '-fno-exceptions', '-Wall', '-Werror'],
+		'cflags': ['-O0', '-funwind-tables', '-fno-exceptions', '-Wall', '-Werror'],
 		'conditions': [
 			['OS=="linux"', {
 				'defines': ['__linux__'],
@@ -52,6 +52,8 @@
 				'defines': ['__APPLE__'],
 				'CLANG_CXX_LIBRARY': 'libc++',
 				'OTHER_CFLAGS': ['-std=c++17', '-O0', '-funwind-tables', '-fno-exceptions'],
+				'cflags_cc+': ['-Wno-deprecated-volatile'],
+				'cflags+': ['-Wno-deprecated-volatile'],
 			}],
 			['OS=="win"', {
 				'defines': ['WIN32_LEAN_AND_MEAN', 'VC_EXTRALEAN', '_WIN32', '_HAS_EXCEPTIONS=0'],

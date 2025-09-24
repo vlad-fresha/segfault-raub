@@ -61,14 +61,18 @@ bool useJsonOutput = false;
 	size_t stackBytes = SIGSTKSZ;
 	char* _altStackBytes = new char[stackBytes];
 
+#ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wc++11-narrowing"
+#endif
 	stack_t _altStack = {
 		_altStackBytes,
 		0,
 		stackBytes
 	};
+#ifdef __clang__
 #pragma clang diagnostic pop
+#endif
 #endif
 
 time_t timeInfo;
