@@ -61,11 +61,10 @@ bool useJsonOutput = false;
 	int stackBytes = (int)SIGSTKSZ;
 	char* _altStackBytes = new char[stackBytes];
 
-	stack_t _altStack = {
-		_altStackBytes,
-		0,
-		static_cast<size_t>(stackBytes),
-	};
+	stack_t _altStack;
+	_altStack.ss_sp = _altStackBytes;
+	_altStack.ss_flags = 0;
+	_altStack.ss_size = stackBytes;
 #endif
 
 time_t timeInfo;

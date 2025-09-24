@@ -59,7 +59,7 @@
 				'msvs_settings': {
 					'VCCLCompilerTool': {
 						'AdditionalOptions' : [
-							'/GL', '/GF', '/EHa-s-c-', '/GS', '/Gy', '/GR-', '/std:c++17', '/W4', '/WX',
+							'/GL', '/GF', '/EHa-s-c-', '/GS', '/Gy', '/GR-', '/std:c++17', '/W4', '/WX', '/wd4127',
 						],
 					},
 					'VCLinkerTool': {
