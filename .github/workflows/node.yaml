@@ -2,8 +2,6 @@ name: NodeCI
 
 on:
   push:
-    # tags:
-    #   - v*
 
 env:
   NAPI_VERSION: 9
@@ -11,108 +9,97 @@ env:
   MACOSX_DEPLOYMENT_TARGET: "10.13"
 
 jobs:
-  build-and-test:
-    name: Build ${{ matrix.docker-arch || matrix.arch }} on ${{ matrix.docker-image || matrix.container || matrix.os }} ${{ matrix.libc }}
+  test-linux:
+    name: Test ${{ matrix.image }} (${{ matrix.stack-lib }}) on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    container: ${{ matrix.container }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+        image: [node:20-alpine3.22, node:22-alpine3.22, node:24-alpine3.22, node:20, node:22, node:24]
+        stack-lib: [glibc, libunwind]
+        exclude:
+          # Alpine containers don't use glibc
+          - image: node:20-alpine3.22
+            stack-lib: glibc
+          - image: node:22-alpine3.22
+            stack-lib: glibc
+          - image: node:24-alpine3.22
+            stack-lib: glibc
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build & test in native container
+        shell: bash
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/work \
+            -e CI=1 -e npm_config_build_from_source=1 -e NAPI_VERSION -e BINDING_NAME \
+            ${{ matrix.image }} \
+            sh -c "
+              export ARCH=${{ matrix.os == 'ubuntu-24.04-arm' && 'arm64' || 'amd64' }}
+
+              if command -v apk > /dev/null; then
+                apk add --no-cache build-base python3 libunwind-dev
+              else
+                apt-get update && apt-get install -y build-essential python3
+                if [ '${{ matrix.stack-lib }}' = 'libunwind' ]; then
+                  apt-get install -y libunwind-dev
+                else
+                  # For glibc builds, ensure execinfo is available (usually built-in)
+                  apt-get install -y libc6-dev
+                fi
+              fi
+
+              cd /work
+              npm install
+              npm run rebuild -- --arch=\${ARCH}
+              mkdir -p prebuilds/$BINDING_NAME-linux-\${ARCH}
+              cp build/Release/$BINDING_NAME.node prebuilds/$BINDING_NAME-linux-\${ARCH}/node-napi-v$NAPI_VERSION.node
+              npm run test-ci
+            "
+
+  test-native:
+    name: Test Node.js ${{ matrix.node }} on ${{ matrix.os }} ${{ matrix.arch }}
+    needs: test-linux
+    runs-on: ${{ matrix.os }}
 
     strategy:
       fail-fast: false
       matrix:
         include:
-          # windows
           - os: windows-2022
             arch: x64
-            is-native: true
-          # macos
+            node: '24.x'
           - os: macos-latest
             arch: arm64
-            is-native: true
+            node: '24.x'
           - os: macos-13
             arch: x64
-            is-native: true
-          # linux
-          - os: ubuntu-latest
-            arch: x64
-            is-native: true
-            node-version: "20.19.4"
-          - os: ubuntu-latest
-            arch: x64
-            is-native: true
-            container: node:20-alpine3.22
-            libc: musl
-          - os: ubuntu-24.04-arm
-            arch: arm64
-            is-native: true
-            docker-arch: linux/arm64
-            docker-image: node:20-alpine3.22
-            libc: musl
+            node: '24.x'
 
     steps:
-      - name: Dependencies (Ubuntu)
-        if: matrix.os == 'ubuntu-latest' && !matrix.container
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libunwind-dev
-
-      - name: Dependencies (rockylinux)
-        if: contains(matrix.container, 'rockylinux')
-        run: |
-          curl -sL https://rpm.nodesource.com/setup_20.x | bash -
-
-          # Install appropriate development tools based on RockyLinux version
-          if grep -q "Rocky Linux release 8" /etc/rocky-release 2>/dev/null; then
-            dnf install -y gcc-toolset-11-toolchain make git python3 nodejs
-            echo "/opt/rh/gcc-toolset-11/root/usr/bin" >> $GITHUB_PATH
-          elif grep -q "Rocky Linux release 9" /etc/rocky-release 2>/dev/null; then
-            # Rocky 9 uses standard gcc and development tools
-            dnf install -y gcc gcc-c++ make git python3 nodejs
-            # No need to add special path for system gcc
-          elif grep -q "Rocky Linux release 10" /etc/rocky-release 2>/dev/null; then
-            # Rocky 10 uses standard gcc and development tools
-            dnf install -y gcc gcc-c++ make git python3 nodejs
-            # No need to add special path for system gcc
-          else
-            # Fallback: use system gcc
-            dnf install -y gcc gcc-c++ make git python3 nodejs
-          fi
-
-          corepack enable
-      - name: Dependencies (Alpine Linux)
-        if: contains(matrix.container, 'alpine')
-        run: |
-          echo "=== Alpine Linux Dependency Installation ==="
-          echo "Container: ${{ matrix.container }}"
-          echo "Architecture: ${{ matrix.arch }}"
-          apk update
-          # Install essential build dependencies for Alpine/musl
-          apk add build-base git python3 bash musl-dev linux-headers
-          # Install libunwind for stack unwinding (better than execinfo on Alpine)
-          apk add libunwind-dev libunwind-static
-          # Verify libunwind installation
-          pkg-config --libs libunwind || echo "libunwind pkg-config not available"
-          ls -la /usr/lib/libunwind* 2>/dev/null || echo "libunwind libraries not found"
-          echo "Alpine Linux build environment ready with libunwind support"
-          echo "=== End Alpine Dependencies ==="
-
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Setup Node.js
-        if: ${{ !matrix.docker-arch && !matrix.container }}
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version || '20.x' }}
+          node-version: ${{ matrix.node }}
 
-      - name: rebuild
-        if: ${{ !matrix.docker-arch }}
+      - name: Dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # macOS typically uses built-in libunwind, no extra deps needed
+          echo "macOS using built-in libunwind"
+
+      - name: Build & Test
         shell: bash
         run: |
           npm install
           npm run rebuild -- --arch=${{ matrix.arch }}
 
-          # Create prebuilds structure manually for better reliability
+          # Create prebuilds directory structure
           PLATFORM=""
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             PLATFORM="win32"
@@ -122,7 +109,7 @@ jobs:
             PLATFORM="linux"
           fi
 
-          mkdir -p "prebuilds/$BINDING_NAME-$PLATFORM-${{ matrix.arch }}/"
+          mkdir -p "prebuilds/$BINDING_NAME-$PLATFORM-${{ matrix.arch }}"
           if [ -f "build/Release/$BINDING_NAME.node" ]; then
             cp "build/Release/$BINDING_NAME.node" "prebuilds/$BINDING_NAME-$PLATFORM-${{ matrix.arch }}/node-napi-v$NAPI_VERSION.node"
             echo "Copied $BINDING_NAME.node to prebuilds directory"
@@ -131,118 +118,7 @@ jobs:
             exit 1
           fi
 
-          if [ -n "${{ matrix.is-native }}" ]; then
-            npm run test-ci
-          fi
+          npm run test-ci
         env:
           CI: true
           npm_config_build_from_source: true
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        if: ${{ matrix.docker-arch && env.dockerhub_username != '' }}
-        env:
-          dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        if: matrix.docker-arch
-      - name: Pre-fetch image
-        if: matrix.docker-arch
-        run: docker pull ${{ matrix.docker-image }} --platform=${{ matrix.docker-arch }}
-      - name: rebuild (in docker)
-        uses: addnab/docker-run-action@v3
-        if: matrix.docker-arch
-        with:
-          image: ${{ matrix.docker-image }}
-          # shell: bash
-          options: --platform=${{ matrix.docker-arch }} -v ${{ github.workspace }}:/work -e CI=1 -e npm_config_build_from_source=1 -e NAPI_VERSION -e BINDING_NAME
-          run: |
-            if command -v apt-get &> /dev/null
-            then
-              apt-get update
-              apt-get install -y python3
-            elif command -v yum &> /dev/null
-            then
-              curl -sL https://rpm.nodesource.com/setup_20.x | bash -
-
-              # Install appropriate development tools for RockyLinux version
-              if grep -q "Rocky Linux release 8" /etc/rocky-release 2>/dev/null; then
-                dnf install -y gcc-toolset-11-toolchain make git python3 nodejs
-                export PATH=/opt/rh/gcc-toolset-11/root/usr/bin:$PATH
-              elif grep -q "Rocky Linux release 9" /etc/rocky-release 2>/dev/null; then
-                # Rocky 9 uses standard gcc and development tools
-                dnf install -y gcc gcc-c++ make git python3 nodejs
-                # No need to modify PATH for system gcc
-              elif grep -q "Rocky Linux release 10" /etc/rocky-release 2>/dev/null; then
-                # Rocky 10 uses standard gcc and development tools
-                dnf install -y gcc gcc-c++ make git python3 nodejs
-                # No need to modify PATH for system gcc
-              else
-                # Fallback: use system gcc
-                dnf install -y gcc gcc-c++ make git python3 nodejs
-              fi
-            elif command -v apk &> /dev/null
-            then
-              # Alpine Linux dependencies
-              apk update
-              apk add build-base git python3 bash musl-dev linux-headers libunwind-dev libunwind-static
-              # Verify libunwind installation
-              pkg-config --libs libunwind || echo "libunwind pkg-config not available"
-              ls -la /usr/lib/libunwind* 2>/dev/null || echo "libunwind libraries not found"
-              echo "Alpine Linux build environment ready with libunwind support"
-            fi
-
-            cd /work
-
-            npm install
-            npm install # run twice to avoid issues with armv7 running out of memory
-            npm run rebuild -- --arch=${{ matrix.arch }}
-
-            # Debug: Check what was built
-            ls -la build/Release/ || echo "No build/Release directory"
-
-            # Create prebuilds structure manually if pkg-prebuilds-copy fails
-            mkdir -p prebuilds/$BINDING_NAME-linux-${{ matrix.arch }}/
-            if [ -f "build/Release/$BINDING_NAME.node" ]; then
-              cp "build/Release/$BINDING_NAME.node" "prebuilds/$BINDING_NAME-linux-${{ matrix.arch }}/node-napi-v$NAPI_VERSION.node"
-              echo "Copied $BINDING_NAME.node to prebuilds directory"
-            else
-              echo "ERROR: $BINDING_NAME.node not found in build/Release/"
-              exit 1
-            fi
-
-            # Debug: Check prebuilds structure
-            find prebuilds -name "*.node" -ls || echo "No .node files in prebuilds"
-
-            npm run test-ci
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ runner.os }}-${{ matrix.arch }}-${{ matrix.libc }}-prebuilds
-          path: prebuilds
-          retention-days: 1
-
-  bundle:
-    name: Bundle prebuilds
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: tmp
-
-      - name: Display structure of downloaded files
-        run: |
-          mkdir prebuilds
-          cp -R tmp/*/* prebuilds/
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: all-prebuilds
-          path: prebuilds
-          retention-days: 7

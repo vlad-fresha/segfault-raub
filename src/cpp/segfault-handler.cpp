@@ -7,6 +7,7 @@
 #include <time.h>
 #include <fcntl.h>
 #include <cstring>
+#include <inttypes.h>
 
 #ifdef _WIN32
 #include <io.h>
@@ -41,6 +42,9 @@
 
 namespace segfault {
 
+// Configuration: true for JSON output, false for plain text output
+bool useJsonOutput = false;
+
 #ifdef _WIN32
 	constexpr auto GETPID = _getpid;
 	#define SEGFAULT_HANDLER LONG CALLBACK handleSignal(PEXCEPTION_POINTERS info)
@@ -54,14 +58,21 @@ namespace segfault {
 	#define HANDLER_CANCEL return
 	#define HANDLER_DONE return
 	
-	int stackBytes = (int)SIGSTKSZ;
+	size_t stackBytes = SIGSTKSZ;
 	char* _altStackBytes = new char[stackBytes];
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc++11-narrowing"
+#endif
 	stack_t _altStack = {
 		_altStackBytes,
 		0,
-		stackBytes,
+		stackBytes
 	};
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 #endif
 
 time_t timeInfo;
@@ -208,6 +219,146 @@ static inline std::pair<uint32_t, uint64_t> _getSignalAndAddress(siginfo_t *info
 #endif
 
 
+// Write JSON stack trace to stderr
+static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address) {
+	constexpr int STDERR_FD = 2;
+
+	// Get current time in ISO format
+	time_t now = time(0);
+	struct tm *utc_tm = gmtime(&now);
+	char timestamp[32];
+	strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%S.000Z", utc_tm);
+
+	// Start JSON object with timestamp and level
+	const char* json_start = "{\"time\":\"";
+	write(STDERR_FD, json_start, strlen(json_start));
+	write(STDERR_FD, timestamp, strlen(timestamp));
+
+	const char* level_part = "\",\"level\":\"ERROR\",\"type\":\"segfault\",\"signal\":";
+	write(STDERR_FD, level_part, strlen(level_part));
+
+	// Write signal ID
+	char signal_str[32];
+	int signal_len = snprintf(signal_str, sizeof(signal_str), "%u", signalId);
+	write(STDERR_FD, signal_str, signal_len);
+
+	// Write signal name
+	const char* signal_name_prefix = ",\"signal_name\":\"";
+	write(STDERR_FD, signal_name_prefix, strlen(signal_name_prefix));
+
+	std::string signalName;
+	if (signalNames.count(signalId)) {
+		signalName = signalNames.at(signalId);
+	} else {
+		signalName = std::to_string(signalId);
+	}
+	write(STDERR_FD, signalName.c_str(), signalName.length());
+
+	// Write human-readable message
+	const char* msg_prefix = "\",\"message\":\"Process ";
+	write(STDERR_FD, msg_prefix, strlen(msg_prefix));
+
+	int pid = GETPID();
+	char pid_msg[16];
+	int pid_msg_len = snprintf(pid_msg, sizeof(pid_msg), "%d", pid);
+	write(STDERR_FD, pid_msg, pid_msg_len);
+
+	const char* msg_middle = " received ";
+	write(STDERR_FD, msg_middle, strlen(msg_middle));
+	write(STDERR_FD, signalName.c_str(), signalName.length());
+	const char* msg_end = " signal";
+	write(STDERR_FD, msg_end, strlen(msg_end));
+
+	// Write address
+	const char* addr_prefix = "\",\"address\":\"0x";
+	write(STDERR_FD, addr_prefix, strlen(addr_prefix));
+
+	char addr_str[32];
+	int addr_len = snprintf(addr_str, sizeof(addr_str), "%" PRIx64, address);
+	write(STDERR_FD, addr_str, addr_len);
+
+	// Write PID
+	const char* pid_prefix = "\",\"pid\":";
+	write(STDERR_FD, pid_prefix, strlen(pid_prefix));
+	write(STDERR_FD, pid_msg, pid_msg_len);
+
+	// Start stack trace array
+	const char* stack_prefix = ",\"stack\":[";
+	write(STDERR_FD, stack_prefix, strlen(stack_prefix));
+
+#ifdef _WIN32
+	// TODO: Implement Windows JSON stack trace
+	const char* placeholder = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<windows_stack_not_implemented>\"}";
+	write(STDERR_FD, placeholder, strlen(placeholder));
+#else
+#if HAVE_EXECINFO_H
+	void *array[32];
+	size_t size = backtrace(array, 32);
+	char **symbols = backtrace_symbols(array, size);
+
+	for (size_t i = 0; i < size; i++) {
+		if (i > 0) {
+			const char* comma = ",";
+			write(STDERR_FD, comma, 1);
+		}
+
+		const char* frame_start = "{\"frame\":";
+		write(STDERR_FD, frame_start, strlen(frame_start));
+
+		char frame_num[16];
+		int frame_len = snprintf(frame_num, sizeof(frame_num), "%zu", i);
+		write(STDERR_FD, frame_num, frame_len);
+
+		const char* addr_start = ",\"address\":\"";
+		write(STDERR_FD, addr_start, strlen(addr_start));
+
+		char addr_hex[32];
+		int hex_len = snprintf(addr_hex, sizeof(addr_hex), "%p", array[i]);
+		write(STDERR_FD, addr_hex, hex_len);
+
+		const char* symbol_start = "\",\"symbol\":\"";
+		write(STDERR_FD, symbol_start, strlen(symbol_start));
+
+		if (symbols && symbols[i]) {
+			// Escape any quotes in the symbol name
+			const char* symbol = symbols[i];
+			while (*symbol) {
+				if (*symbol == '"' || *symbol == '\\') {
+					const char* escape = "\\";
+					write(STDERR_FD, escape, 1);
+				}
+				write(STDERR_FD, symbol, 1);
+				symbol++;
+			}
+		} else {
+			const char* unknown = "<unknown>";
+			write(STDERR_FD, unknown, strlen(unknown));
+		}
+
+		const char* frame_end = "\"}";
+		write(STDERR_FD, frame_end, strlen(frame_end));
+	}
+
+	if (symbols) {
+		free(symbols);
+	}
+
+#elif HAVE_LIBUNWIND_H
+	// Alpine Linux libunwind - use minimal safe approach to avoid crashes
+	// Just write one safe fallback frame since libunwind seems problematic in signal handlers
+	const char* alpine_frame = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<alpine_libunwind_disabled_in_signal_handler>\"}";
+	write(STDERR_FD, alpine_frame, strlen(alpine_frame));
+#else
+	const char* no_stack = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<no_stack_trace_available>\"}";
+	write(STDERR_FD, no_stack, strlen(no_stack));
+#endif
+#endif
+
+	// Close JSON object
+	const char* json_end = "]}\n";
+	write(STDERR_FD, json_end, strlen(json_end));
+}
+
 // Write stack trace to outfile and cerr
 static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 #ifdef _WIN32
@@ -228,16 +379,13 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 		close(fd);
 	}
 #elif HAVE_LIBUNWIND_H
-	// Use libunwind for stack unwinding (better for Alpine/musl)
+	// Use libunwind for stack unwinding (better for Alpine/musl) with robust error handling
 	unw_cursor_t cursor;
 	unw_context_t context;
 	unw_word_t ip, sp, off;
 	char symbol[256];
 	int frame = 0;
 	constexpr int STDERR_FD = 2;
-
-	unw_getcontext(&context);
-	unw_init_local(&cursor, &context);
 
 	const char* header = "Stack trace (libunwind):\n";
 	write(STDERR_FD, header, strlen(header));
@@ -247,27 +395,78 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 		write(fd, header, strlen(header));
 	}
 
-	while (unw_step(&cursor) > 0 && frame < 32) {
-		unw_get_reg(&cursor, UNW_REG_IP, &ip);
-		unw_get_reg(&cursor, UNW_REG_SP, &sp);
-
-		symbol[0] = '\0';
-		if (unw_get_proc_name(&cursor, symbol, sizeof(symbol), &off) == 0) {
-			char buffer[512];
-			int len = snprintf(buffer, sizeof(buffer), "%2d: 0x%lx <%s+0x%lx>\n", frame, ip, symbol, off);
-			write(STDERR_FD, buffer, len);
+	// Initialize libunwind with error checking
+	int getcontext_ret = unw_getcontext(&context);
+	if (getcontext_ret != 0) {
+		const char* error_msg = "Error: Failed to get libunwind context\n";
+		write(STDERR_FD, error_msg, strlen(error_msg));
+		if (fd > 0) {
+			write(fd, error_msg, strlen(error_msg));
+		}
+	} else {
+		int init_ret = unw_init_local(&cursor, &context);
+		if (init_ret != 0) {
+			const char* error_msg = "Error: Failed to initialize libunwind cursor\n";
+			write(STDERR_FD, error_msg, strlen(error_msg));
 			if (fd > 0) {
-				write(fd, buffer, len);
+				write(fd, error_msg, strlen(error_msg));
 			}
 		} else {
-			char buffer[256];
-			int len = snprintf(buffer, sizeof(buffer), "%2d: 0x%lx\n", frame, ip);
-			write(STDERR_FD, buffer, len);
-			if (fd > 0) {
-				write(fd, buffer, len);
+			// Successfully initialized - unwind the stack
+			int step_ret;
+			bool frames_written = false;
+
+			while ((step_ret = unw_step(&cursor)) > 0 && frame < 32) {
+				frames_written = true;
+
+				// Get registers with error handling
+				ip = 0;
+				sp = 0;
+				int ip_ret = unw_get_reg(&cursor, UNW_REG_IP, &ip);
+				unw_get_reg(&cursor, UNW_REG_SP, &sp);
+
+				symbol[0] = '\0';
+				int symbol_ret = unw_get_proc_name(&cursor, symbol, sizeof(symbol), &off);
+
+				if (symbol_ret == 0 && symbol[0] != '\0') {
+					char buffer[512];
+					int len = snprintf(buffer, sizeof(buffer), "%2d: 0x%lx <%s+0x%lx>\n",
+						frame, ip, symbol, off);
+					write(STDERR_FD, buffer, len);
+					if (fd > 0) {
+						write(fd, buffer, len);
+					}
+				} else {
+					char buffer[256];
+					int len;
+					if (ip_ret == 0) {
+						len = snprintf(buffer, sizeof(buffer), "%2d: 0x%lx <unknown>\n", frame, ip);
+					} else {
+						len = snprintf(buffer, sizeof(buffer), "%2d: <no_address> <unknown>\n", frame);
+					}
+					write(STDERR_FD, buffer, len);
+					if (fd > 0) {
+						write(fd, buffer, len);
+					}
+				}
+				frame++;
+			}
+
+			// Check if we failed to get any frames or if step failed
+			if (!frames_written) {
+				const char* no_frames_msg = "Warning: No stack frames could be unwound\n";
+				write(STDERR_FD, no_frames_msg, strlen(no_frames_msg));
+				if (fd > 0) {
+					write(fd, no_frames_msg, strlen(no_frames_msg));
+				}
+			} else if (step_ret < 0) {
+				const char* step_error_msg = "Warning: Stack unwinding terminated due to error\n";
+				write(STDERR_FD, step_error_msg, strlen(step_error_msg));
+				if (fd > 0) {
+					write(fd, step_error_msg, strlen(step_error_msg));
+				}
 			}
 		}
-		frame++;
 	}
 
 	if (fd > 0) {
@@ -355,27 +554,49 @@ DBG_EXPORT SEGFAULT_HANDLER {
 	auto signalAndAdress = _getSignalAndAddress(info);
 	uint32_t signalId = signalAndAdress.first;
 	uint64_t address = signalAndAdress.second;
-	
+
 	if (!_isSignalEnabled(signalId)) {
 		HANDLER_CANCEL;
 	}
-	
-	std::ofstream outfile = _openLogFile();
-	
-	_writeTimeToFile(outfile);
-	_writeLogHeader(outfile, signalId, address);
-	_writeStackTrace(outfile, signalId);
-	
-	_closeLogFile(outfile);
-	
+
+	if (useJsonOutput) {
+		// Write JSON stack trace to stderr
+		_writeJsonStackTrace(signalId, address);
+	} else {
+		// Write traditional output
+		std::ofstream outfile = _openLogFile();
+
+		_writeTimeToFile(outfile);
+		_writeLogHeader(outfile, signalId, address);
+		_writeStackTrace(outfile, signalId);
+
+		_closeLogFile(outfile);
+	}
+
 	HANDLER_DONE;
+}
+
+
+DBG_EXPORT void setJsonOutputMode(bool jsonOutput) {
+	useJsonOutput = jsonOutput;
+}
+
+DBG_EXPORT bool getJsonOutputMode() {
+	return useJsonOutput;
 }
 
 
 // create some stack frames to inspect from CauseSegfault
 DBG_EXPORT NO_INLINE void _segfaultStackFrame1() {
 	int *foo = reinterpret_cast<int*>(1);
-	*foo = 42; // triggers a segfault exception
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+#endif
+	*foo = 42; // triggers a segfault exception (intentional)
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 }
 
 DBG_EXPORT NO_INLINE void _segfaultStackFrame2(void) {
@@ -438,13 +659,13 @@ static inline void _enableSignal(uint32_t signalId) {
 		memset(&action, 0, sizeof(struct sigaction));
 		sigemptyset(&action.sa_mask);
 		action.sa_sigaction = handleSignal;
-		
+
 		if (signalId == SIGSEGV) {
 			action.sa_flags = SA_SIGINFO | SA_ONSTACK | SA_RESETHAND;
 		} else {
 			action.sa_flags = SA_SIGINFO | SA_RESETHAND;
 		}
-		
+
 		sigaction(signalId, &action, NULL);
 	#endif
 }
@@ -490,7 +711,7 @@ DBG_EXPORT void init() {
 	#ifdef _WIN32
 		SetUnhandledExceptionFilter(handleSignal);
 	#endif
-	
+
 	// `SetThreadStackGuarantee` and `sigaltstack` help in handling stack overflows on their platforms.
 	#ifdef _WIN32
 		ULONG size = 32 * 1024;
@@ -498,12 +719,27 @@ DBG_EXPORT void init() {
 	#else
 		sigaltstack(&_altStack, nullptr);
 	#endif
-	
+
 	for (auto pair : signalActivity) {
 		if (pair.second) {
 			_enableSignal(pair.first);
 		}
 	}
+}
+
+DBG_EXPORT JS_METHOD(setOutputFormat) { NAPI_ENV;
+	if (IS_ARG_EMPTY(0)) {
+		RET_UNDEFINED;
+	}
+
+	LET_BOOL_ARG(0, jsonOutput);
+	setJsonOutputMode(jsonOutput);
+
+	RET_UNDEFINED;
+}
+
+DBG_EXPORT JS_METHOD(getOutputFormat) { NAPI_ENV;
+	RET_BOOL(getJsonOutputMode());
 }
 
 } // namespace segfault

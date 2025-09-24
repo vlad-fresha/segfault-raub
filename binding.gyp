@@ -2,6 +2,17 @@
 	'variables': {
 		'arch': '<!(node -p "process.arch")',
 	},
+	'conditions': [
+		['OS=="win"', {
+			'variables': {
+				'use_libunwind': 'false',
+			},
+		}, {
+			'variables': {
+				'use_libunwind': '<!(if [ "$USE_LIBUNWIND" = "true" ] || [ "$USE_LIBUNWIND" = "1" ]; then echo "true"; elif [ "$USE_LIBUNWIND" = "false" ] || [ "$USE_LIBUNWIND" = "0" ]; then echo "false"; elif pkg-config --exists libunwind 2>/dev/null; then echo "true"; else echo "false"; fi)',
+			},
+		}],
+	],
 	'targets': [{
 		'target_name': 'vlad_fresha_segfault_handler',
 		'sources': [
@@ -11,17 +22,28 @@
 		'include_dirs': [
 			'<!@(node -p "require(\'addon-tools-raub\').getInclude()")',
 		],
-		'cflags_cc': ['-std=c++17', '-fno-exceptions'],
-		'cflags': ['-O0', '-funwind-tables', '-fno-exceptions'],
+		'cflags_cc': ['-std=c++17', '-fno-exceptions', '-Wall', '-Werror'],
+		'cflags': ['-O0', '-funwind-tables', '-fno-exceptions', '-Wall', '-Werror'],
 		'conditions': [
 			['OS=="linux"', {
 				'defines': ['__linux__'],
 				'conditions': [
-					['"<(arch)"=="x64"', {
-						'libraries': ['-lunwind', '-lunwind-x86_64'],
+					['use_libunwind=="true"', {
+						'conditions': [
+							['"<(arch)"=="x64"', {
+								'libraries': ['-lunwind', '-lunwind-x86_64'],
+							}],
+							['"<(arch)"=="arm64"', {
+								'libraries': ['-lstdc++fs', '-lunwind', '-lunwind-aarch64'],
+							}],
+						],
 					}],
-					['"<(arch)"=="arm64"', {
-						'libraries': ['-lstdc++fs', '-lunwind', '-lunwind-aarch64'],
+					['use_libunwind=="false"', {
+						'conditions': [
+							['"<(arch)"=="arm64"', {
+								'libraries': ['-lstdc++fs'],
+							}],
+						],
 					}],
 				],
 			}],
@@ -30,6 +52,8 @@
 				'defines': ['__APPLE__'],
 				'CLANG_CXX_LIBRARY': 'libc++',
 				'OTHER_CFLAGS': ['-std=c++17', '-O0', '-funwind-tables', '-fno-exceptions'],
+				'cflags_cc+': ['-Wno-deprecated-volatile'],
+				'cflags+': ['-Wno-deprecated-volatile'],
 			}],
 			['OS=="win"', {
 				'defines': ['WIN32_LEAN_AND_MEAN', 'VC_EXTRALEAN', '_WIN32', '_HAS_EXCEPTIONS=0'],
@@ -37,7 +61,7 @@
 				'msvs_settings': {
 					'VCCLCompilerTool': {
 						'AdditionalOptions' : [
-							'/GL', '/GF', '/EHa-s-c-', '/GS', '/Gy', '/GR-', '/std:c++17',
+							'/GL', '/GF', '/EHa-s-c-', '/GS', '/Gy', '/GR-', '/std:c++17', '/W4', '/WX', '/wd4127', '/wd4100', '/wd4068', '/wd4189',
 						],
 					},
 					'VCLinkerTool': {
