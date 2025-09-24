@@ -157,9 +157,11 @@ static inline void _loadModule(
 	DWORD size
 ) {
 	DWORD result = ERROR_SUCCESS;
-	
+
 	if (!pSymLoadModuleEx(hProcess, 0, img, mod, baseAddr, size, nullptr, 0)) {
-		GetLastError();
+		result = GetLastError();
+		// Error handling could be added here if needed
+		(void)result; // Mark as intentionally unused to suppress warning
 	}
 }
 
