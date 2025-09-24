@@ -58,13 +58,14 @@ bool useJsonOutput = false;
 	#define HANDLER_CANCEL return
 	#define HANDLER_DONE return
 	
-	int stackBytes = (int)SIGSTKSZ;
+	size_t stackBytes = SIGSTKSZ;
 	char* _altStackBytes = new char[stackBytes];
 
-	stack_t _altStack;
-	_altStack.ss_sp = _altStackBytes;
-	_altStack.ss_flags = 0;
-	_altStack.ss_size = stackBytes;
+	stack_t _altStack = {
+		_altStackBytes,
+		0,
+		stackBytes
+	};
 #endif
 
 time_t timeInfo;
