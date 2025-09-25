@@ -344,114 +344,32 @@ static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address) {
 	}
 
 #elif HAVE_LIBUNWIND_H
-	// Use minimal, signal-safe libunwind approach for Alpine/musl systems
-	// Libunwind can be problematic in signal handlers, so we use a very conservative approach
+	// ARM64 Alpine libunwind - ultra-minimal approach to avoid signal handler issues
+	// Problem: unw_get_proc_name() can hang/crash in signal handlers on ARM64 Alpine
+	// Solution: Get addresses only, no symbol resolution
 
-	// Try libunwind with maximum safety and early bailout on any issues
 	unw_cursor_t cursor;
 	unw_context_t context;
 	unw_word_t ip = 0;
-	unw_word_t off = 0;
-	char symbol_buffer[128]; // Smaller buffer to reduce stack usage
-	bool success = false;
+	bool got_frame = false;
 
-	// Use setjmp/longjmp-style error recovery isn't safe in signal handlers,
-	// so we'll just be very defensive and bail out at first sign of trouble
-
-	if (unw_getcontext(&context) == 0) {
-		if (unw_init_local(&cursor, &context) == 0) {
-			// Try to get just the first frame safely
-			if (unw_step(&cursor) > 0) {
-				if (unw_get_reg(&cursor, UNW_REG_IP, &ip) == 0) {
-					success = true;
-
-					// Try to get symbol name, but don't fail if we can't
-					symbol_buffer[0] = '\0';
-					unw_get_proc_name(&cursor, symbol_buffer, sizeof(symbol_buffer), &off);
-
-					// Write first frame with proper JSON escaping
-					write(STDERR_FD, "{\"frame\":0,\"address\":\"0x", strlen("{\"frame\":0,\"address\":\"0x"));
-
-					// Write hex address
-					char addr_buffer[32];
-					int addr_len = snprintf(addr_buffer, sizeof(addr_buffer), "%lx", ip);
-					write(STDERR_FD, addr_buffer, addr_len);
-
-					write(STDERR_FD, "\",\"symbol\":\"", strlen("\",\"symbol\":\""));
-
-					// Write symbol with proper escaping
-					if (symbol_buffer[0] != '\0') {
-						const char* symbol_ptr = symbol_buffer;
-						while (*symbol_ptr) {
-							if (*symbol_ptr == '"' || *symbol_ptr == '\\') {
-								write(STDERR_FD, "\\", 1);
-							}
-							write(STDERR_FD, symbol_ptr, 1);
-							symbol_ptr++;
-						}
-
-						// Add offset if available
-						if (off > 0) {
-							char offset_buffer[32];
-							int offset_len = snprintf(offset_buffer, sizeof(offset_buffer), " + %lu", off);
-							write(STDERR_FD, offset_buffer, offset_len);
-						}
-					} else {
-						write(STDERR_FD, "<unknown>", strlen("<unknown>"));
-					}
-
-					write(STDERR_FD, "\"}", strlen("\"}"));
-
-					// Try to get one more frame if possible, but don't loop extensively
-					if (unw_step(&cursor) > 0) {
-						if (unw_get_reg(&cursor, UNW_REG_IP, &ip) == 0) {
-							symbol_buffer[0] = '\0';
-							unw_get_proc_name(&cursor, symbol_buffer, sizeof(symbol_buffer), &off);
-
-							write(STDERR_FD, ",", 1);
-
-							// Write second frame with proper JSON escaping
-							write(STDERR_FD, "{\"frame\":1,\"address\":\"0x", strlen("{\"frame\":1,\"address\":\"0x"));
-
-							// Write hex address
-							addr_len = snprintf(addr_buffer, sizeof(addr_buffer), "%lx", ip);
-							write(STDERR_FD, addr_buffer, addr_len);
-
-							write(STDERR_FD, "\",\"symbol\":\"", strlen("\",\"symbol\":\""));
-
-							// Write symbol with proper escaping
-							if (symbol_buffer[0] != '\0') {
-								const char* symbol_ptr = symbol_buffer;
-								while (*symbol_ptr) {
-									if (*symbol_ptr == '"' || *symbol_ptr == '\\') {
-										write(STDERR_FD, "\\", 1);
-									}
-									write(STDERR_FD, symbol_ptr, 1);
-									symbol_ptr++;
-								}
-
-								// Add offset if available
-								if (off > 0) {
-									char offset_buffer[32];
-									int offset_len = snprintf(offset_buffer, sizeof(offset_buffer), " + %lu", off);
-									write(STDERR_FD, offset_buffer, offset_len);
-								}
-							} else {
-								write(STDERR_FD, "<unknown>", strlen("<unknown>"));
-							}
-
-							write(STDERR_FD, "\"}", strlen("\"}"));
-						}
-					}
-				}
-			}
+	// Get only the current frame with address - no stepping to avoid ARM64 Alpine issues
+	if (unw_getcontext(&context) == 0 && unw_init_local(&cursor, &context) == 0) {
+		// Get current frame IP only - no stepping which can hang on ARM64
+		if (unw_get_reg(&cursor, UNW_REG_IP, &ip) == 0 && ip != 0) {
+			got_frame = true;
+			// Write single frame with address only
+			char frame_buffer[128];
+			int frame_len = snprintf(frame_buffer, sizeof(frame_buffer),
+				"{\"frame\":0,\"address\":\"0x%lx\",\"symbol\":\"<libunwind_arm64_alpine_single_frame>\"}", ip);
+			write(STDERR_FD, frame_buffer, frame_len);
 		}
 	}
 
-	// If libunwind failed completely, provide a minimal fallback
-	if (!success) {
-		const char* fallback_frame = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<libunwind_failed_safely>\"}";
-		write(STDERR_FD, fallback_frame, strlen(fallback_frame));
+	// Fallback if we couldn't get any frames
+	if (!got_frame) {
+		const char* fallback = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<libunwind_context_failed>\"}";
+		write(STDERR_FD, fallback, strlen(fallback));
 	}
 #else
 	const char* no_stack = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<no_stack_trace_available>\"}";
