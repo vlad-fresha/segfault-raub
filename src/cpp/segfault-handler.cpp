@@ -17,6 +17,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <dlfcn.h>
+#include <ucontext.h>
 #ifdef __has_include
   #if __has_include(<execinfo.h>)
     #include <execinfo.h>
@@ -221,7 +222,7 @@ static inline std::pair<uint32_t, uint64_t> _getSignalAndAddress(siginfo_t *info
 
 
 // Write JSON stack trace to stderr
-static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address) {
+static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address, void* context = nullptr) {
 	constexpr int STDERR_FD = 2;
 
 	// Get current time in ISO format
@@ -355,16 +356,19 @@ static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address) {
 	#ifdef __aarch64__
 	void* crash_ip = nullptr;
 
-	// Try different approaches to get the crash location
-	// First, try using the signal context if available (but we don't have ucontext_t here)
-	// For now, use the return address from x30, but also try to get the current PC
+	// Try to get the actual crash location from signal context
+	if (context) {
+		ucontext_t* uctx = (ucontext_t*)context;
+		// On ARM64, PC (program counter) is in uc_mcontext.pc
+		crash_ip = (void*)uctx->uc_mcontext.pc;
+	}
 
-	// Get the link register (return address)
-	void* lr_addr;
-	__asm__ volatile ("mov %0, x30" : "=r" (lr_addr));
-
-	// Try to use the return address as our starting point
-	crash_ip = lr_addr;
+	// Fallback: Get the link register (return address) if no context available
+	if (!crash_ip) {
+		void* lr_addr;
+		__asm__ volatile ("mov %0, x30" : "=r" (lr_addr));
+		crash_ip = lr_addr;
+	}
 
 	if (crash_ip) {
 		Dl_info dlinfo;
@@ -425,8 +429,19 @@ static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address) {
 
 	// Try to get additional frame from frame pointer if possible
 	#ifdef __aarch64__
-	void* frame_fp;
-	__asm__ volatile ("mov %0, x29" : "=r" (frame_fp));
+	void* frame_fp = nullptr;
+
+	// Try to get frame pointer from signal context
+	if (context) {
+		ucontext_t* uctx = (ucontext_t*)context;
+		// On ARM64, x29 is the frame pointer
+		frame_fp = (void*)uctx->uc_mcontext.regs[29];
+	}
+
+	// Fallback: Get current frame pointer if no context available
+	if (!frame_fp) {
+		__asm__ volatile ("mov %0, x29" : "=r" (frame_fp));
+	}
 
 	if (frame_fp && (uintptr_t)frame_fp > 0x1000 &&
 	    (uintptr_t)frame_fp < 0x7ffffffffff0 &&
@@ -694,7 +709,7 @@ DBG_EXPORT SEGFAULT_HANDLER {
 
 	if (useJsonOutput) {
 		// Write JSON stack trace to stderr
-		_writeJsonStackTrace(signalId, address);
+		_writeJsonStackTrace(signalId, address, unused);
 	} else {
 		// Write traditional output
 		std::ofstream outfile = _openLogFile();
