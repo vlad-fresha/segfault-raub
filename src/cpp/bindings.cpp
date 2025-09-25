@@ -6,23 +6,30 @@
 
 #include "segfault-handler.hpp"
 
-#define JS_NULL env.Null()
+#define JS_SF_CONSTANT(name) \
+	do { \
+		napi_value num_val; \
+		napi_create_double(env, static_cast<double>(name), &num_val); \
+		napi_set_named_property(env, exports, #name, num_val); \
+	} while(0)
 
-#define JS_SF_CONSTANT(name)                                                    \
-	exports.Set(#name, static_cast<double>(name));
+#define JS_SF_NULL(name) \
+	do { \
+		napi_value null_val; \
+		napi_get_null(env, &null_val); \
+		napi_set_named_property(env, exports, #name, null_val); \
+	} while(0)
 
-#define JS_SF_NULL(name)                                                        \
-	exports.Set(#name, JS_NULL);
+#define JS_SF_SET_METHOD(name) \
+	do { \
+		napi_value fn; \
+		napi_create_function(env, #name, NAPI_AUTO_LENGTH, segfault::name, nullptr, &fn); \
+		napi_set_named_property(env, exports, #name, fn); \
+	} while(0)
 
-#define JS_SF_SET_METHOD(name)                                                  \
-	exports.DefineProperty(                                                     \
-		Napi::PropertyDescriptor::Function(env, exports, #name, segfault::name) \
-	);
-
-
-Napi::Object initModule(Napi::Env env, Napi::Object exports) {
+napi_value initModule(napi_env env, napi_value exports) {
 	segfault::init();
-	
+
 	JS_SF_SET_METHOD(causeSegfault);
 	JS_SF_SET_METHOD(causeDivisionInt);
 	JS_SF_SET_METHOD(causeOverflow);
@@ -30,7 +37,7 @@ Napi::Object initModule(Napi::Env env, Napi::Object exports) {
 	JS_SF_SET_METHOD(setSignal);
 	JS_SF_SET_METHOD(setOutputFormat);
 	JS_SF_SET_METHOD(getOutputFormat);
-	
+
 #ifdef _WIN32
 	JS_SF_CONSTANT(EXCEPTION_ACCESS_VIOLATION);
 	JS_SF_CONSTANT(EXCEPTION_DATATYPE_MISALIGNMENT);
@@ -106,7 +113,7 @@ Napi::Object initModule(Napi::Env env, Napi::Object exports) {
 	JS_SF_NULL(EXCEPTION_INVALID_DISPOSITION);
 	JS_SF_NULL(EXCEPTION_GUARD_PAGE);
 	JS_SF_NULL(EXCEPTION_INVALID_HANDLE);
-    
+
 	JS_SF_CONSTANT(SIGINT);
 	JS_SF_CONSTANT(SIGILL);
 	JS_SF_CONSTANT(SIGABRT);
@@ -136,9 +143,8 @@ Napi::Object initModule(Napi::Env env, Napi::Object exports) {
 	JS_SF_CONSTANT(SIGWINCH);
 	JS_SF_CONSTANT(SIGSYS);
 #endif
-	
+
 	return exports;
 }
 
-
-NODE_API_MODULE(vlad_fresha_segfault_handler, initModule)
+NAPI_MODULE(vlad_fresha_segfault_handler, initModule)

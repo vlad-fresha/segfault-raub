@@ -19,9 +19,7 @@
 			'src/cpp/bindings.cpp',
 			'src/cpp/segfault-handler.cpp',
 		],
-		'include_dirs': [
-			'<!@(node -p "require(\'node-addon-api\').include")',
-		],
+		'include_dirs': [],
 		'cflags_cc': ['-std=c++17', '-fno-exceptions', '-Wall', '-Werror'],
 		'cflags': ['-O0', '-funwind-tables', '-fno-exceptions', '-Wall', '-Werror'],
 		'conditions': [

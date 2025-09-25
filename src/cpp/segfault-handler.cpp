@@ -605,7 +605,7 @@ DBG_EXPORT NO_INLINE void _segfaultStackFrame2(void) {
 }
 
 
-DBG_EXPORT JS_METHOD(causeSegfault) { NAPI_ENV;
+DBG_EXPORT JS_METHOD(causeSegfault) {
 	std::cout << "SegfaultHandler: about to cause a segfault..." << std::endl;
 	void (*fn_ptr)() = _segfaultStackFrame2;
 	fn_ptr();
@@ -619,7 +619,7 @@ DBG_EXPORT NO_INLINE void _divideInt() {
 }
 
 
-DBG_EXPORT JS_METHOD(causeDivisionInt) { NAPI_ENV;
+DBG_EXPORT JS_METHOD(causeDivisionInt) {
 	_divideInt();
 	RET_UNDEFINED;
 }
@@ -635,14 +635,14 @@ DBG_EXPORT NO_INLINE void _overflowStack() {
 	_overflowStack(); // infinite recursion
 }
 
-DBG_EXPORT JS_METHOD(causeOverflow) { NAPI_ENV;
+DBG_EXPORT JS_METHOD(causeOverflow) {
 	std::cout << "SegfaultHandler: about to overflow the stack..." << std::endl;
 	_overflowStack();
 	RET_UNDEFINED;
 }
 
 
-DBG_EXPORT JS_METHOD(causeIllegal) { NAPI_ENV;
+DBG_EXPORT JS_METHOD(causeIllegal) {
 	std::cout << "SegfaultHandler: about to raise an illegal operation..." << std::endl;
 #ifdef _WIN32
 	RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION, 0, 0, nullptr);
@@ -677,11 +677,12 @@ static inline void _disableSignal(uint32_t signalId) {
 }
 
 
-DBG_EXPORT JS_METHOD(setSignal) { NAPI_ENV;
-	if (IS_ARG_EMPTY(0)) {
+DBG_EXPORT JS_METHOD(setSignal) {
+	GET_ARGS(2);
+	if (argc == 0) {
 		RET_UNDEFINED;
 	}
-	
+
 	LET_INT32_ARG(0, signalId);
 	LET_BOOL_ARG(1, value);
 	
@@ -727,8 +728,9 @@ DBG_EXPORT void init() {
 	}
 }
 
-DBG_EXPORT JS_METHOD(setOutputFormat) { NAPI_ENV;
-	if (IS_ARG_EMPTY(0)) {
+DBG_EXPORT JS_METHOD(setOutputFormat) {
+	GET_ARGS(1);
+	if (argc == 0) {
 		RET_UNDEFINED;
 	}
 
@@ -738,7 +740,7 @@ DBG_EXPORT JS_METHOD(setOutputFormat) { NAPI_ENV;
 	RET_UNDEFINED;
 }
 
-DBG_EXPORT JS_METHOD(getOutputFormat) { NAPI_ENV;
+DBG_EXPORT JS_METHOD(getOutputFormat) {
 	RET_BOOL(getJsonOutputMode());
 }
 
