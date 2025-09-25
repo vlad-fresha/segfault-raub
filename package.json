@@ -52,7 +52,6 @@
 	"devDependencies": {
 		"@eslint/js": "^9.3.0",
 		"@types/node": "^20.12.13",
-		"addon-tools-raub": "^8.0.0",
 		"eslint": "^9.3.0",
 		"node-addon-api": "^8.0.0",
 		"typescript": "^5.4.5"

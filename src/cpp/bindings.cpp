@@ -6,6 +6,7 @@
 
 #include "segfault-handler.hpp"
 
+#define JS_NULL env.Null()
 
 #define JS_SF_CONSTANT(name)                                                    \
 	exports.Set(#name, static_cast<double>(name));
