@@ -46,6 +46,7 @@
 		"url": "git+https://github.com/vlad-fresha/segfault-raub.git"
 	},
 	"dependencies": {
+		"node-addon-api": "^8.5.0",
 		"node-gyp": "^11.4.2",
 		"pkg-prebuilds": "^1.0.0"
 	},

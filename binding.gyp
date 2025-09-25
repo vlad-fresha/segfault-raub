@@ -1,6 +1,7 @@
 {
 	'variables': {
 		'arch': '<!(node -p "process.arch")',
+		'is_musl': '<!(if ldd --version 2>&1 | grep -q musl; then echo "true"; else echo "false"; fi)',
 	},
 	'conditions': [
 		['OS=="win"', {
@@ -9,7 +10,7 @@
 			},
 		}, {
 			'variables': {
-				'use_libunwind': '<!(if [ "$USE_LIBUNWIND" = "true" ] || [ "$USE_LIBUNWIND" = "1" ]; then echo "true"; elif [ "$USE_LIBUNWIND" = "false" ] || [ "$USE_LIBUNWIND" = "0" ]; then echo "false"; elif pkg-config --exists libunwind 2>/dev/null; then echo "true"; else echo "false"; fi)',
+				'use_libunwind': '<!(if [ "$USE_LIBUNWIND" = "true" ] || [ "$USE_LIBUNWIND" = "1" ]; then echo "true"; elif [ "$USE_LIBUNWIND" = "false" ] || [ "$USE_LIBUNWIND" = "0" ]; then echo "false"; else echo "true"; fi)',
 			},
 		}],
 	],
@@ -30,11 +31,23 @@
 				'conditions': [
 					['use_libunwind=="true"', {
 						'conditions': [
-							['"<(arch)"=="x64"', {
-								'libraries': ['-lunwind', '-lunwind-x86_64'],
-							}],
-							['"<(arch)"=="arm64"', {
-								'libraries': ['-lstdc++fs', '-lunwind', '-lunwind-aarch64'],
+							['is_musl=="true"', {
+								# Use local static libunwind for musl systems
+								'libraries': [
+									'<(PRODUCT_DIR)/../../src/libunwind/libunwind.so.8.1.0',
+									'<(PRODUCT_DIR)/../../src/libunwind/liblzma.so.5',
+								],
+								'ldflags': ['-static-libgcc', '-static-libstdc++'],
+							}, {
+								# Use system libunwind for glibc systems
+								'conditions': [
+									['"<(arch)"=="x64"', {
+										'libraries': ['-lunwind', '-lunwind-x86_64'],
+									}],
+									['"<(arch)"=="arm64"', {
+										'libraries': ['-lstdc++fs', '-lunwind', '-lunwind-aarch64'],
+									}],
+								],
 							}],
 						],
 					}],

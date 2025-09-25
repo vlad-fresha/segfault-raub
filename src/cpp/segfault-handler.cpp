@@ -57,7 +57,7 @@ bool useJsonOutput = false;
 	#define NO_INLINE __attribute__ ((noinline))
 	#define HANDLER_CANCEL return
 	#define HANDLER_DONE return
-	
+
 	size_t stackBytes = SIGSTKSZ;
 	char* _altStackBytes = new char[stackBytes];
 
@@ -490,16 +490,16 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 
 static inline std::ofstream _openLogFile() {
 	std::ofstream outfile;
-	
+
 	if (!std::filesystem::exists("segfault.log")) {
 		std::cerr
 			<< "SegfaultHandler: The exception won't be logged into a file"
 			<< ", unless 'segfault.log' exists." << std::endl;
 		return outfile;
 	}
-	
+
 	outfile.open("segfault.log", std::ofstream::app);
-	
+
 	return outfile;
 }
 
@@ -507,9 +507,9 @@ static inline void _writeTimeToFile(std::ofstream &outfile) {
 	if (!outfile.is_open()) {
 		return;
 	}
-	
+
 	time(&timeInfo);
-	
+
 	outfile << "\n\nAt " << ctime(&timeInfo) << std::endl; // NOLINT
 	if (outfile.bad()) {
 		std::cerr << "SegfaultHandler: Error writing to file." << std::endl;
@@ -532,11 +532,11 @@ static inline void _writeHeaderToOstream(std::ostream &stream, int pid, uint32_t
 static inline void _writeLogHeader(std::ofstream &outfile, uint32_t signalId, uint64_t address) {
 	int pid = GETPID();
 	_writeHeaderToOstream(std::cerr, pid, signalId, address);
-	
+
 	if (!outfile.is_open()) {
 		return;
 	}
-	
+
 	_writeHeaderToOstream(outfile, pid, signalId, address);
 	if (outfile.bad()) {
 		std::cerr << "SegfaultHandler: Error writing to file." << std::endl;
@@ -681,26 +681,26 @@ DBG_EXPORT JS_METHOD(setSignal) { NAPI_ENV;
 	if (IS_ARG_EMPTY(0)) {
 		RET_UNDEFINED;
 	}
-	
+
 	LET_INT32_ARG(0, signalId);
 	LET_BOOL_ARG(1, value);
-	
+
 	if (!signalNames.count(signalId)) {
 		RET_UNDEFINED;
 	}
-	
+
 	bool wasEnabled = signalActivity[signalId];
 	if (wasEnabled == value) {
 		RET_UNDEFINED;
 	}
-	
+
 	signalActivity[signalId] = value;
 	if (value) {
 		_enableSignal(signalId);
 	} else {
 		_disableSignal(signalId);
 	}
-	
+
 	RET_UNDEFINED;
 }
 

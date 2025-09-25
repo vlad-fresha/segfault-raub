@@ -22,7 +22,7 @@
 
 Napi::Object initModule(Napi::Env env, Napi::Object exports) {
 	segfault::init();
-	
+
 	JS_SF_SET_METHOD(causeSegfault);
 	JS_SF_SET_METHOD(causeDivisionInt);
 	JS_SF_SET_METHOD(causeOverflow);
@@ -30,7 +30,7 @@ Napi::Object initModule(Napi::Env env, Napi::Object exports) {
 	JS_SF_SET_METHOD(setSignal);
 	JS_SF_SET_METHOD(setOutputFormat);
 	JS_SF_SET_METHOD(getOutputFormat);
-	
+
 #ifdef _WIN32
 	JS_SF_CONSTANT(EXCEPTION_ACCESS_VIOLATION);
 	JS_SF_CONSTANT(EXCEPTION_DATATYPE_MISALIGNMENT);
@@ -106,7 +106,7 @@ Napi::Object initModule(Napi::Env env, Napi::Object exports) {
 	JS_SF_NULL(EXCEPTION_INVALID_DISPOSITION);
 	JS_SF_NULL(EXCEPTION_GUARD_PAGE);
 	JS_SF_NULL(EXCEPTION_INVALID_HANDLE);
-    
+
 	JS_SF_CONSTANT(SIGINT);
 	JS_SF_CONSTANT(SIGILL);
 	JS_SF_CONSTANT(SIGABRT);
@@ -136,7 +136,7 @@ Napi::Object initModule(Napi::Env env, Napi::Object exports) {
 	JS_SF_CONSTANT(SIGWINCH);
 	JS_SF_CONSTANT(SIGSYS);
 #endif
-	
+
 	return exports;
 }
 
