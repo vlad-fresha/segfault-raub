@@ -58,6 +58,7 @@ jobs:
               mkdir -p prebuilds/$BINDING_NAME-linux-\${ARCH}
               cp build/Release/$BINDING_NAME.node prebuilds/$BINDING_NAME-linux-\${ARCH}/node-napi-v$NAPI_VERSION.node
               npm run eslint
+              npm run typecheck
               npm run test-ci
             "
 
@@ -120,6 +121,7 @@ jobs:
           fi
 
           npm run eslint
+          npm run typecheck
           npm run test-ci
         env:
           CI: true

@@ -1,15 +1,17 @@
 {
 	"author": "Vlad Bokov <vladimir.bokov@fresha.com>",
 	"name": "@vlad-fresha/segfault-raub",
-	"version": "2.6.0",
+	"version": "2.7.0",
 	"description": "Catches SIGSEGV and prints diagnostic information",
 	"main": "index.js",
 	"exports": {
 		".": {
 			"import": "./index.mjs",
-			"require": "./index.js"
+			"require": "./index.js",
+			"types": "./index.d.ts"
 		}
 	},
+	"types": "index.d.ts",
 	"license": "MIT, BSD-3-Clause, BSD-2-Clause",
 	"keywords": [
 		"headers",
@@ -43,7 +45,8 @@
 		"eslint": "eslint .",
 		"eslint:fix": "eslint --fix .",
 		"test": "node --test --watch .",
-		"test-ci": "node --test"
+		"test-ci": "node --test",
+		"typecheck": "tsc --noEmit --strict index.d.ts"
 	},
 	"engines": {
 		"node": ">=20.3.0",
