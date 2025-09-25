@@ -1,7 +1,7 @@
 {
-	"author": "Luis Blanco <luisblanco1337@gmail.com>",
+	"author": "Vlad Bokov <vladimir.bokov@fresha.com>",
 	"name": "@vlad-fresha/segfault-raub",
-	"version": "2.4.0",
+	"version": "2.5.0",
 	"description": "Catches SIGSEGV and prints diagnostic information",
 	"main": "index.js",
 	"license": "MIT, BSD-3-Clause, BSD-2-Clause",
@@ -34,6 +34,7 @@
 		"build": "node-gyp build",
 		"rebuild": "node-gyp clean configure build",
 		"eslint": "eslint .",
+		"eslint:fix": "eslint --fix .",
 		"test": "node --test --watch .",
 		"test-ci": "node --test"
 	},

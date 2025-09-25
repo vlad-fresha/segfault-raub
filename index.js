@@ -4,9 +4,9 @@
 if (global['segfault-raub']) {
 	module.exports = global['segfault-raub'];
 } else {
-	const core = require("pkg-prebuilds/bindings")(
+	const core = require('pkg-prebuilds/bindings')(
 		__dirname,
-		require("./binding-options")
+		require('./binding-options')
 	  );
 	
 	global['segfault-raub'] = core;
