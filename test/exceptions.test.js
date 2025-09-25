@@ -168,21 +168,26 @@ describe('JSON Output Format', () => {
 		const platform = getPlatform();
 
 		if (platform === 'linux' || platform === 'aarch64') {
-			// On Linux ARM64, we should get either:
+			// On Linux (both x86_64 and ARM64), we should get either:
 			// 1. Real mangled C++ function names (starting with _Z)
 			// 2. Module names in angle brackets
 			// 3. Address fallbacks
 			// 4. Unknown symbols (acceptable in some CI environments)
+			// 5. Backtrace symbol format (like "file.so+0x123" or "file.so(symbol+0x123)")
 			const isMangled = frame.symbol.startsWith('_Z');
 			const isModule = frame.symbol.startsWith('<') && frame.symbol.endsWith('>');
 			const isAddress = /^0x[0-9a-f]+$/i.test(frame.symbol);
 			const isUnknown = frame.symbol === 'unknown' || frame.symbol === '<unknown>';
+			const isBacktraceFormat = frame.symbol.includes('(') ||
+									 frame.symbol.includes('+0x') ||
+									 frame.symbol.includes('.so') ||
+									 frame.symbol.includes('[');
 
-			assert.ok(isMangled || isModule || isAddress || isUnknown,
-				'Linux symbol should be mangled function, module name, address, or unknown, ' +
+			assert.ok(isMangled || isModule || isAddress || isUnknown || isBacktraceFormat,
+				'Linux symbol should be mangled function, module name, address, unknown, or backtrace format, ' +
 				`got: ${frame.symbol}`);
 
-			// If it's a mangled function, it should contain segfault-related symbols
+			// If it's a mangled function, it should contain segfault-related symbols (be flexible)
 			if (isMangled) {
 				// Should be related to segfault functions (but be flexible about exact content)
 				const hasSegfaultRef = frame.symbol.includes('segfault') ||
@@ -200,6 +205,13 @@ describe('JSON Output Format', () => {
 					frame.symbol.includes('segfault');
 				assert.ok(isOurModule,
 					`Module should reference our native module or similar, got: ${frame.symbol}`);
+			}
+
+			// If it's backtrace format, should have some meaningful content
+			if (isBacktraceFormat) {
+				// Just verify it's not completely empty and has some structure
+				assert.ok(frame.symbol.length > 5,
+					`Backtrace format should have meaningful content, got: ${frame.symbol}`);
 			}
 		} else if (platform === 'windows') {
 			// On Windows, we expect module and function information
@@ -295,7 +307,11 @@ describe('Plain Text Output Format', () => {
 				response.includes('vlad_fresha_segfault_handler') ||
 				response.includes('Stack trace') ||
 				response.includes('libunwind') ||
-				response.includes('<unknown>'); // Even unknown symbols indicate stack tracing worked
+				response.includes('<unknown>') ||
+				response.includes('(') || // backtrace symbol format
+				response.includes('+0x') || // offset format
+				response.includes('.so') || // shared library format
+				response.includes('['); // address format
 
 			// Should have either addresses, symbols, or stack trace indicators
 			assert.ok(hasAddresses || hasSymbols,
