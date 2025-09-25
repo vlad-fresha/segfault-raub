@@ -1,9 +1,15 @@
 {
 	"author": "Vlad Bokov <vladimir.bokov@fresha.com>",
 	"name": "@vlad-fresha/segfault-raub",
-	"version": "2.5.0",
+	"version": "2.6.0",
 	"description": "Catches SIGSEGV and prints diagnostic information",
 	"main": "index.js",
+	"exports": {
+		".": {
+			"import": "./index.mjs",
+			"require": "./index.js"
+		}
+	},
 	"license": "MIT, BSD-3-Clause, BSD-2-Clause",
 	"keywords": [
 		"headers",
@@ -20,6 +26,7 @@
 	"files": [
 		"index.js",
 		"index.d.ts",
+		"index.mjs",
 		"LICENSE",
 		"LICENSE_node-segfault-handler",
 		"package.json",
