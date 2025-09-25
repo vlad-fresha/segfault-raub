@@ -219,9 +219,19 @@ static inline std::pair<uint32_t, uint64_t> _getSignalAndAddress(siginfo_t *info
 #endif
 
 
+// Helper function to write to stderr and suppress unused result warnings
+static inline void safe_write_stderr(const void* buf, size_t count) {
+	constexpr int STDERR_FD = 2;
+	ssize_t result = write(STDERR_FD, buf, count);
+	// Explicitly use the result to satisfy warn_unused_result
+	if (result < 0) {
+		// In signal handler context, we can't do much about write failures
+		// Just continue with the crash reporting
+	}
+}
+
 // Write JSON stack trace to stderr
 static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address) {
-	constexpr int STDERR_FD = 2;
 
 	// Get current time in ISO format
 	time_t now = time(0);
@@ -231,20 +241,20 @@ static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address) {
 
 	// Start JSON object with timestamp and level
 	const char* json_start = "{\"time\":\"";
-	(void)write(STDERR_FD, json_start, strlen(json_start));
-	(void)write(STDERR_FD, timestamp, strlen(timestamp));
+	safe_write_stderr( json_start, strlen(json_start));
+	safe_write_stderr( timestamp, strlen(timestamp));
 
 	const char* level_part = "\",\"level\":\"ERROR\",\"type\":\"segfault\",\"signal\":";
-	(void)write(STDERR_FD, level_part, strlen(level_part));
+	safe_write_stderr( level_part, strlen(level_part));
 
 	// Write signal ID
 	char signal_str[32];
 	int signal_len = snprintf(signal_str, sizeof(signal_str), "%u", signalId);
-	(void)write(STDERR_FD, signal_str, signal_len);
+	safe_write_stderr( signal_str, signal_len);
 
 	// Write signal name
 	const char* signal_name_prefix = ",\"signal_name\":\"";
-	(void)write(STDERR_FD, signal_name_prefix, strlen(signal_name_prefix));
+	safe_write_stderr( signal_name_prefix, strlen(signal_name_prefix));
 
 	std::string signalName;
 	if (signalNames.count(signalId)) {
@@ -252,44 +262,44 @@ static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address) {
 	} else {
 		signalName = std::to_string(signalId);
 	}
-	(void)write(STDERR_FD, signalName.c_str(), signalName.length());
+	safe_write_stderr( signalName.c_str(), signalName.length());
 
 	// Write human-readable message
 	const char* msg_prefix = "\",\"message\":\"Process ";
-	(void)write(STDERR_FD, msg_prefix, strlen(msg_prefix));
+	safe_write_stderr( msg_prefix, strlen(msg_prefix));
 
 	int pid = GETPID();
 	char pid_msg[16];
 	int pid_msg_len = snprintf(pid_msg, sizeof(pid_msg), "%d", pid);
-	(void)write(STDERR_FD, pid_msg, pid_msg_len);
+	safe_write_stderr( pid_msg, pid_msg_len);
 
 	const char* msg_middle = " received ";
-	(void)write(STDERR_FD, msg_middle, strlen(msg_middle));
-	(void)write(STDERR_FD, signalName.c_str(), signalName.length());
+	safe_write_stderr( msg_middle, strlen(msg_middle));
+	safe_write_stderr( signalName.c_str(), signalName.length());
 	const char* msg_end = " signal";
-	(void)write(STDERR_FD, msg_end, strlen(msg_end));
+	safe_write_stderr( msg_end, strlen(msg_end));
 
 	// Write address
 	const char* addr_prefix = "\",\"address\":\"0x";
-	(void)write(STDERR_FD, addr_prefix, strlen(addr_prefix));
+	safe_write_stderr( addr_prefix, strlen(addr_prefix));
 
 	char addr_str[32];
 	int addr_len = snprintf(addr_str, sizeof(addr_str), "%" PRIx64, address);
-	(void)write(STDERR_FD, addr_str, addr_len);
+	safe_write_stderr( addr_str, addr_len);
 
 	// Write PID
 	const char* pid_prefix = "\",\"pid\":";
-	(void)write(STDERR_FD, pid_prefix, strlen(pid_prefix));
-	(void)write(STDERR_FD, pid_msg, pid_msg_len);
+	safe_write_stderr( pid_prefix, strlen(pid_prefix));
+	safe_write_stderr( pid_msg, pid_msg_len);
 
 	// Start stack trace array
 	const char* stack_prefix = ",\"stack\":[";
-	(void)write(STDERR_FD, stack_prefix, strlen(stack_prefix));
+	safe_write_stderr( stack_prefix, strlen(stack_prefix));
 
 #ifdef _WIN32
 	// TODO: Implement Windows JSON stack trace
 	const char* placeholder = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<windows_stack_not_implemented>\"}";
-	(void)write(STDERR_FD, placeholder, strlen(placeholder));
+	safe_write_stderr( placeholder, strlen(placeholder));
 #else
 #if HAVE_EXECINFO_H
 	void *array[32];
@@ -299,25 +309,25 @@ static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address) {
 	for (size_t i = 0; i < size; i++) {
 		if (i > 0) {
 			const char* comma = ",";
-			(void)write(STDERR_FD, comma, 1);
+			safe_write_stderr( comma, 1);
 		}
 
 		const char* frame_start = "{\"frame\":";
-		(void)write(STDERR_FD, frame_start, strlen(frame_start));
+		safe_write_stderr( frame_start, strlen(frame_start));
 
 		char frame_num[16];
 		int frame_len = snprintf(frame_num, sizeof(frame_num), "%zu", i);
-		(void)write(STDERR_FD, frame_num, frame_len);
+		safe_write_stderr( frame_num, frame_len);
 
 		const char* addr_start = ",\"address\":\"";
-		(void)write(STDERR_FD, addr_start, strlen(addr_start));
+		safe_write_stderr( addr_start, strlen(addr_start));
 
 		char addr_hex[32];
 		int hex_len = snprintf(addr_hex, sizeof(addr_hex), "%p", array[i]);
-		(void)write(STDERR_FD, addr_hex, hex_len);
+		safe_write_stderr( addr_hex, hex_len);
 
 		const char* symbol_start = "\",\"symbol\":\"";
-		(void)write(STDERR_FD, symbol_start, strlen(symbol_start));
+		safe_write_stderr( symbol_start, strlen(symbol_start));
 
 		if (symbols && symbols[i]) {
 			// Escape any quotes in the symbol name
@@ -325,18 +335,18 @@ static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address) {
 			while (*symbol) {
 				if (*symbol == '"' || *symbol == '\\') {
 					const char* escape = "\\";
-					(void)write(STDERR_FD, escape, 1);
+					safe_write_stderr( escape, 1);
 				}
-				(void)write(STDERR_FD, symbol, 1);
+				safe_write_stderr( symbol, 1);
 				symbol++;
 			}
 		} else {
 			const char* unknown = "<unknown>";
-			(void)write(STDERR_FD, unknown, strlen(unknown));
+			safe_write_stderr( unknown, strlen(unknown));
 		}
 
 		const char* frame_end = "\"}";
-		(void)write(STDERR_FD, frame_end, strlen(frame_end));
+		safe_write_stderr( frame_end, strlen(frame_end));
 	}
 
 	if (symbols) {
@@ -347,16 +357,16 @@ static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address) {
 	// Alpine Linux libunwind - use minimal safe approach to avoid crashes
 	// Just write one safe fallback frame since libunwind seems problematic in signal handlers
 	const char* alpine_frame = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<alpine_libunwind_disabled_in_signal_handler>\"}";
-	(void)write(STDERR_FD, alpine_frame, strlen(alpine_frame));
+	safe_write_stderr( alpine_frame, strlen(alpine_frame));
 #else
 	const char* no_stack = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<no_stack_trace_available>\"}";
-	(void)write(STDERR_FD, no_stack, strlen(no_stack));
+	safe_write_stderr( no_stack, strlen(no_stack));
 #endif
 #endif
 
 	// Close JSON object
 	const char* json_end = "]}\n";
-	(void)write(STDERR_FD, json_end, strlen(json_end));
+	safe_write_stderr( json_end, strlen(json_end));
 }
 
 // Write stack trace to outfile and cerr
@@ -388,7 +398,7 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 	constexpr int STDERR_FD = 2;
 
 	const char* header = "Stack trace (libunwind):\n";
-	(void)write(STDERR_FD, header, strlen(header));
+	safe_write_stderr( header, strlen(header));
 
 	int fd = open("segfault.log", O_CREAT | O_APPEND | O_WRONLY, S_IRUSR | S_IRGRP | S_IROTH);
 	if (fd > 0) {
@@ -399,7 +409,7 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 	int getcontext_ret = unw_getcontext(&context);
 	if (getcontext_ret != 0) {
 		const char* error_msg = "Error: Failed to get libunwind context\n";
-		(void)write(STDERR_FD, error_msg, strlen(error_msg));
+		safe_write_stderr( error_msg, strlen(error_msg));
 		if (fd > 0) {
 			write(fd, error_msg, strlen(error_msg));
 		}
@@ -407,7 +417,7 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 		int init_ret = unw_init_local(&cursor, &context);
 		if (init_ret != 0) {
 			const char* error_msg = "Error: Failed to initialize libunwind cursor\n";
-			(void)write(STDERR_FD, error_msg, strlen(error_msg));
+			safe_write_stderr( error_msg, strlen(error_msg));
 			if (fd > 0) {
 				write(fd, error_msg, strlen(error_msg));
 			}
@@ -432,7 +442,7 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 					char buffer[512];
 					int len = snprintf(buffer, sizeof(buffer), "%2d: 0x%lx <%s+0x%lx>\n",
 						frame, ip, symbol, off);
-					(void)write(STDERR_FD, buffer, len);
+					safe_write_stderr( buffer, len);
 					if (fd > 0) {
 						write(fd, buffer, len);
 					}
@@ -444,7 +454,7 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 					} else {
 						len = snprintf(buffer, sizeof(buffer), "%2d: <no_address> <unknown>\n", frame);
 					}
-					(void)write(STDERR_FD, buffer, len);
+					safe_write_stderr( buffer, len);
 					if (fd > 0) {
 						write(fd, buffer, len);
 					}
@@ -455,13 +465,13 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 			// Check if we failed to get any frames or if step failed
 			if (!frames_written) {
 				const char* no_frames_msg = "Warning: No stack frames could be unwound\n";
-				(void)write(STDERR_FD, no_frames_msg, strlen(no_frames_msg));
+				safe_write_stderr( no_frames_msg, strlen(no_frames_msg));
 				if (fd > 0) {
 					write(fd, no_frames_msg, strlen(no_frames_msg));
 				}
 			} else if (step_ret < 0) {
 				const char* step_error_msg = "Warning: Stack unwinding terminated due to error\n";
-				(void)write(STDERR_FD, step_error_msg, strlen(step_error_msg));
+				safe_write_stderr( step_error_msg, strlen(step_error_msg));
 				if (fd > 0) {
 					write(fd, step_error_msg, strlen(step_error_msg));
 				}
@@ -476,7 +486,7 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 	// Neither execinfo nor libunwind available
 	constexpr int STDERR_FD = 2;
 	const char* msg = "Stack trace not available (no unwinding library found)\n";
-	(void)write(STDERR_FD, msg, strlen(msg));
+	safe_write_stderr( msg, strlen(msg));
 
 	int fd = open("segfault.log", O_CREAT | O_APPEND | O_WRONLY, S_IRUSR | S_IRGRP | S_IROTH);
 	if (fd > 0) {
