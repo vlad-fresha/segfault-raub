@@ -345,89 +345,140 @@ static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address) {
 	}
 
 #elif HAVE_LIBUNWIND_H
-	// ARM64 Alpine libunwind with safe symbol resolution using dladdr()
-	// Problem: unw_get_proc_name() can hang/crash in signal handlers on ARM64 Alpine
-	// Solution: Use libunwind for addresses, dladdr() for safe symbol resolution
+	// ARM64 Alpine: Simplified but robust stack unwinding
+	// Start with the crash address itself, then try to get caller information
 
-	unw_cursor_t cursor;
-	unw_context_t context;
-	unw_word_t ip = 0;
-	bool got_frame = false;
+	bool wrote_any_frame = false;
 
-	// Get only the current frame with address - no stepping to avoid ARM64 Alpine issues
-	if (unw_getcontext(&context) == 0 && unw_init_local(&cursor, &context) == 0) {
-		// Get current frame IP only - no stepping which can hang on ARM64
-		if (unw_get_reg(&cursor, UNW_REG_IP, &ip) == 0 && ip != 0) {
-			got_frame = true;
+	// First, try to resolve the crash address directly
+	// On ARM64, we want to capture the actual point where the segfault occurred
+	#ifdef __aarch64__
+	void* crash_ip = nullptr;
 
-			// Write frame start
-			write(STDERR_FD, "{\"frame\":0,\"address\":\"0x", strlen("{\"frame\":0,\"address\":\"0x"));
+	// Try different approaches to get the crash location
+	// First, try using the signal context if available (but we don't have ucontext_t here)
+	// For now, use the return address from x30, but also try to get the current PC
 
-			// Write hex address
-			char addr_buffer[32];
-			int addr_len = snprintf(addr_buffer, sizeof(addr_buffer), "%lx", ip);
-			write(STDERR_FD, addr_buffer, addr_len);
+	// Get the link register (return address)
+	void* lr_addr;
+	__asm__ volatile ("mov %0, x30" : "=r" (lr_addr));
+
+	// Try to use the return address as our starting point
+	crash_ip = lr_addr;
+
+	if (crash_ip) {
+		Dl_info dlinfo;
+		if (dladdr(crash_ip, &dlinfo)) {
+			wrote_any_frame = true;
+
+			write(STDERR_FD, "{\"frame\":0,\"address\":\"", strlen("{\"frame\":0,\"address\":\""));
+
+			char addr_hex[32];
+			int hex_len = snprintf(addr_hex, sizeof(addr_hex), "0x%lx", (uintptr_t)crash_ip);
+			write(STDERR_FD, addr_hex, hex_len);
 
 			write(STDERR_FD, "\",\"symbol\":\"", strlen("\",\"symbol\":\""));
 
-			// Use dladdr for safe symbol resolution in signal handlers
-			Dl_info dlinfo;
-			if (dladdr((void*)ip, &dlinfo)) {
-				// Successfully resolved symbol with dladdr
-				if (dlinfo.dli_sname && dlinfo.dli_sname[0] != '\0') {
-					// Write symbol name with proper JSON escaping
-					const char* symbol_ptr = dlinfo.dli_sname;
-					int symbol_len = 0;
-					while (*symbol_ptr && symbol_len < 60) { // Limit length for safety
-						if (*symbol_ptr == '"' || *symbol_ptr == '\\') {
-							write(STDERR_FD, "\\", 1);
-						}
-						write(STDERR_FD, symbol_ptr, 1);
-						symbol_ptr++;
-						symbol_len++;
+			if (dlinfo.dli_sname && dlinfo.dli_sname[0] != '\0') {
+				// Write function name
+				const char* symbol_ptr = dlinfo.dli_sname;
+				int symbol_len = 0;
+				while (*symbol_ptr && symbol_len < 100) {
+					if (*symbol_ptr == '"' || *symbol_ptr == '\\') {
+						write(STDERR_FD, "\\", 1);
 					}
-
-					// Add offset if we can calculate it safely
-					if (dlinfo.dli_saddr && (uintptr_t)dlinfo.dli_saddr <= ip) {
-						uintptr_t offset = ip - (uintptr_t)dlinfo.dli_saddr;
-						if (offset > 0 && offset < 0x10000) { // Reasonable offset
-							char offset_buffer[32];
-							int offset_len = snprintf(offset_buffer, sizeof(offset_buffer), " + %zu", offset);
-							write(STDERR_FD, offset_buffer, offset_len);
-						}
-					}
-				} else if (dlinfo.dli_fname && dlinfo.dli_fname[0] != '\0') {
-					// No symbol name, but we have module name
-					write(STDERR_FD, "<", 1);
-					const char* filename = strrchr(dlinfo.dli_fname, '/');
-					const char* basename = filename ? filename + 1 : dlinfo.dli_fname;
-
-					// Write basename with length limit
-					int name_len = 0;
-					while (*basename && name_len < 40) {
-						if (*basename == '"' || *basename == '\\') {
-							write(STDERR_FD, "\\", 1);
-						}
-						write(STDERR_FD, basename, 1);
-						basename++;
-						name_len++;
-					}
-					write(STDERR_FD, ">", 1);
-				} else {
-					write(STDERR_FD, "<dladdr_no_symbol>", strlen("<dladdr_no_symbol>"));
+					write(STDERR_FD, symbol_ptr, 1);
+					symbol_ptr++;
+					symbol_len++;
 				}
+
+				// Add offset if available
+				if (dlinfo.dli_saddr && (uintptr_t)dlinfo.dli_saddr <= (uintptr_t)crash_ip) {
+					uintptr_t offset = (uintptr_t)crash_ip - (uintptr_t)dlinfo.dli_saddr;
+					if (offset > 0 && offset < 0x100000) {
+						char offset_buffer[32];
+						int offset_len = snprintf(offset_buffer, sizeof(offset_buffer), " + %zu", offset);
+						write(STDERR_FD, offset_buffer, offset_len);
+					}
+				}
+			} else if (dlinfo.dli_fname && dlinfo.dli_fname[0] != '\0') {
+				// No function name, use module name
+				write(STDERR_FD, "<", 1);
+				const char* filename = strrchr(dlinfo.dli_fname, '/');
+				const char* basename = filename ? filename + 1 : dlinfo.dli_fname;
+
+				int name_len = 0;
+				while (*basename && name_len < 50) {
+					write(STDERR_FD, basename, 1);
+					basename++;
+					name_len++;
+				}
+				write(STDERR_FD, ">", 1);
 			} else {
-				// dladdr failed, use address-only fallback
-				write(STDERR_FD, "<unknown>", strlen("<unknown>"));
+				write(STDERR_FD, "unknown", strlen("unknown"));
 			}
 
 			write(STDERR_FD, "\"}", strlen("\"}"));
 		}
 	}
+	#endif
 
-	// Fallback if we couldn't get any frames
-	if (!got_frame) {
-		const char* fallback = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<libunwind_context_failed>\"}";
+	// Try to get additional frame from frame pointer if possible
+	#ifdef __aarch64__
+	void* frame_fp;
+	__asm__ volatile ("mov %0, x29" : "=r" (frame_fp));
+
+	if (frame_fp && (uintptr_t)frame_fp > 0x1000 &&
+	    (uintptr_t)frame_fp < 0x7ffffffffff0 &&
+	    ((uintptr_t)frame_fp & 0x7) == 0) {
+
+		// Try to read the caller's return address from the frame
+		struct StackFrame {
+			void* fp;
+			void* lr;
+		};
+
+		StackFrame* frame = (StackFrame*)frame_fp;
+		void* caller_ip = frame->lr;
+
+		if (caller_ip && (uintptr_t)caller_ip > 0x1000) {
+			Dl_info caller_dlinfo;
+			if (dladdr(caller_ip, &caller_dlinfo) &&
+			    caller_dlinfo.dli_sname && caller_dlinfo.dli_sname[0] != '\0') {
+
+				if (wrote_any_frame) {
+					write(STDERR_FD, ",", 1);
+				}
+				wrote_any_frame = true;
+
+				write(STDERR_FD, "{\"frame\":1,\"address\":\"", strlen("{\"frame\":1,\"address\":\""));
+
+				char addr_hex[32];
+				int hex_len = snprintf(addr_hex, sizeof(addr_hex), "0x%lx", (uintptr_t)caller_ip);
+				write(STDERR_FD, addr_hex, hex_len);
+
+				write(STDERR_FD, "\",\"symbol\":\"", strlen("\",\"symbol\":\""));
+
+				const char* symbol_ptr = caller_dlinfo.dli_sname;
+				int symbol_len = 0;
+				while (*symbol_ptr && symbol_len < 100) {
+					if (*symbol_ptr == '"' || *symbol_ptr == '\\') {
+						write(STDERR_FD, "\\", 1);
+					}
+					write(STDERR_FD, symbol_ptr, 1);
+					symbol_ptr++;
+					symbol_len++;
+				}
+
+				write(STDERR_FD, "\"}", strlen("\"}"));
+			}
+		}
+	}
+	#endif
+
+	// Fallback if no frames were obtained
+	if (!wrote_any_frame) {
+		const char* fallback = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<arm64_simple_fallback>\"}";
 		write(STDERR_FD, fallback, strlen(fallback));
 	}
 #else
