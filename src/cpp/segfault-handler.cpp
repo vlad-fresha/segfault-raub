@@ -344,98 +344,114 @@ static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address) {
 	}
 
 #elif HAVE_LIBUNWIND_H
-	// Use libunwind for stack unwinding with robust error handling
+	// Use minimal, signal-safe libunwind approach for Alpine/musl systems
+	// Libunwind can be problematic in signal handlers, so we use a very conservative approach
+
+	// Try libunwind with maximum safety and early bailout on any issues
 	unw_cursor_t cursor;
 	unw_context_t context;
-	unw_word_t ip, sp, off;
-	char symbol[256];
-	int frame = 0;
-	bool first_frame = true;
+	unw_word_t ip = 0;
+	unw_word_t off = 0;
+	char symbol_buffer[128]; // Smaller buffer to reduce stack usage
+	bool success = false;
 
-	// Initialize libunwind with error checking
-	int getcontext_ret = unw_getcontext(&context);
-	if (getcontext_ret != 0) {
-		const char* error_frame = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<libunwind_getcontext_failed>\"}";
-		write(STDERR_FD, error_frame, strlen(error_frame));
-	} else {
-		int init_ret = unw_init_local(&cursor, &context);
-		if (init_ret != 0) {
-			const char* error_frame = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<libunwind_init_failed>\"}";
-			write(STDERR_FD, error_frame, strlen(error_frame));
-		} else {
-			// Successfully initialized - unwind the stack
-			int step_ret;
-			bool frames_written = false;
+	// Use setjmp/longjmp-style error recovery isn't safe in signal handlers,
+	// so we'll just be very defensive and bail out at first sign of trouble
 
-			while ((step_ret = unw_step(&cursor)) > 0 && frame < 32) {
-				if (!first_frame) {
-					const char* comma = ",";
-					write(STDERR_FD, comma, 1);
-				}
-				first_frame = false;
-				frames_written = true;
+	if (unw_getcontext(&context) == 0) {
+		if (unw_init_local(&cursor, &context) == 0) {
+			// Try to get just the first frame safely
+			if (unw_step(&cursor) > 0) {
+				if (unw_get_reg(&cursor, UNW_REG_IP, &ip) == 0) {
+					success = true;
 
-				// Get registers with error handling
-				ip = 0;
-				sp = 0;
-				int ip_ret = unw_get_reg(&cursor, UNW_REG_IP, &ip);
-				unw_get_reg(&cursor, UNW_REG_SP, &sp);
+					// Try to get symbol name, but don't fail if we can't
+					symbol_buffer[0] = '\0';
+					unw_get_proc_name(&cursor, symbol_buffer, sizeof(symbol_buffer), &off);
 
-				// Format frame start
-				char frame_start[64];
-				int frame_start_len = snprintf(frame_start, sizeof(frame_start),
-					"{\"frame\":%d,\"address\":\"0x%lx\",\"symbol\":\"", frame, ip);
-				write(STDERR_FD, frame_start, frame_start_len);
+					// Write first frame with proper JSON escaping
+					write(STDERR_FD, "{\"frame\":0,\"address\":\"0x", strlen("{\"frame\":0,\"address\":\"0x"));
 
-				// Get symbol name
-				symbol[0] = '\0';
-				int symbol_ret = unw_get_proc_name(&cursor, symbol, sizeof(symbol), &off);
+					// Write hex address
+					char addr_buffer[32];
+					int addr_len = snprintf(addr_buffer, sizeof(addr_buffer), "%lx", ip);
+					write(STDERR_FD, addr_buffer, addr_len);
 
-				if (symbol_ret == 0 && symbol[0] != '\0') {
-					// Write symbol with offset information
-					const char* symbol_ptr = symbol;
-					while (*symbol_ptr) {
-						if (*symbol_ptr == '"' || *symbol_ptr == '\\') {
-							const char* escape = "\\";
-							write(STDERR_FD, escape, 1);
+					write(STDERR_FD, "\",\"symbol\":\"", strlen("\",\"symbol\":\""));
+
+					// Write symbol with proper escaping
+					if (symbol_buffer[0] != '\0') {
+						const char* symbol_ptr = symbol_buffer;
+						while (*symbol_ptr) {
+							if (*symbol_ptr == '"' || *symbol_ptr == '\\') {
+								write(STDERR_FD, "\\", 1);
+							}
+							write(STDERR_FD, symbol_ptr, 1);
+							symbol_ptr++;
 						}
-						write(STDERR_FD, symbol_ptr, 1);
-						symbol_ptr++;
+
+						// Add offset if available
+						if (off > 0) {
+							char offset_buffer[32];
+							int offset_len = snprintf(offset_buffer, sizeof(offset_buffer), " + %lu", off);
+							write(STDERR_FD, offset_buffer, offset_len);
+						}
+					} else {
+						write(STDERR_FD, "<unknown>", strlen("<unknown>"));
 					}
 
-					// Add offset if available
-					if (off > 0) {
-						char offset_info[32];
-						int offset_len = snprintf(offset_info, sizeof(offset_info), " + %lu", off);
-						write(STDERR_FD, offset_info, offset_len);
+					write(STDERR_FD, "\"}", strlen("\"}"));
+
+					// Try to get one more frame if possible, but don't loop extensively
+					if (unw_step(&cursor) > 0) {
+						if (unw_get_reg(&cursor, UNW_REG_IP, &ip) == 0) {
+							symbol_buffer[0] = '\0';
+							unw_get_proc_name(&cursor, symbol_buffer, sizeof(symbol_buffer), &off);
+
+							write(STDERR_FD, ",", 1);
+
+							// Write second frame with proper JSON escaping
+							write(STDERR_FD, "{\"frame\":1,\"address\":\"0x", strlen("{\"frame\":1,\"address\":\"0x"));
+
+							// Write hex address
+							addr_len = snprintf(addr_buffer, sizeof(addr_buffer), "%lx", ip);
+							write(STDERR_FD, addr_buffer, addr_len);
+
+							write(STDERR_FD, "\",\"symbol\":\"", strlen("\",\"symbol\":\""));
+
+							// Write symbol with proper escaping
+							if (symbol_buffer[0] != '\0') {
+								const char* symbol_ptr = symbol_buffer;
+								while (*symbol_ptr) {
+									if (*symbol_ptr == '"' || *symbol_ptr == '\\') {
+										write(STDERR_FD, "\\", 1);
+									}
+									write(STDERR_FD, symbol_ptr, 1);
+									symbol_ptr++;
+								}
+
+								// Add offset if available
+								if (off > 0) {
+									char offset_buffer[32];
+									int offset_len = snprintf(offset_buffer, sizeof(offset_buffer), " + %lu", off);
+									write(STDERR_FD, offset_buffer, offset_len);
+								}
+							} else {
+								write(STDERR_FD, "<unknown>", strlen("<unknown>"));
+							}
+
+							write(STDERR_FD, "\"}", strlen("\"}"));
+						}
 					}
-				} else if (ip_ret == 0) {
-					const char* unknown_with_addr = "<unknown>";
-					write(STDERR_FD, unknown_with_addr, strlen(unknown_with_addr));
-				} else {
-					const char* no_info = "<no_address_or_symbol>";
-					write(STDERR_FD, no_info, strlen(no_info));
 				}
-
-				const char* frame_end = "\"}";
-				write(STDERR_FD, frame_end, strlen(frame_end));
-				frame++;
-			}
-
-			// If we didn't write any frames, write a fallback
-			if (!frames_written) {
-				const char* no_frames = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<no_frames_unwound>\"}";
-				write(STDERR_FD, no_frames, strlen(no_frames));
-			} else if (step_ret < 0) {
-				// Add error frame if stepping failed
-				const char* comma = ",";
-				write(STDERR_FD, comma, 1);
-				char error_frame[128];
-				int error_len = snprintf(error_frame, sizeof(error_frame),
-					"{\"frame\":%d,\"address\":\"0x0\",\"symbol\":\"<unwind_step_error_%d>\"}", frame, step_ret);
-				write(STDERR_FD, error_frame, error_len);
 			}
 		}
+	}
+
+	// If libunwind failed completely, provide a minimal fallback
+	if (!success) {
+		const char* fallback_frame = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<libunwind_failed_safely>\"}";
+		write(STDERR_FD, fallback_frame, strlen(fallback_frame));
 	}
 #else
 	const char* no_stack = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<no_stack_trace_available>\"}";
