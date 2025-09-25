@@ -143,6 +143,75 @@ describe('JSON Output Format', () => {
 		assert.ok(typeof frame.symbol === 'string');
 	});
 
+	it('stack trace contains meaningful function information', async () => {
+		let response = await runAndGetErrorWithFormat('causeSegfault', true);
+		const jsonError = parseJsonError(response);
+
+		assert.ok(jsonError, 'Should have valid JSON error');
+		assert.ok(jsonError.stack.length > 0, 'Should have at least one stack frame');
+
+		// Check first stack frame has meaningful content
+		const frame = jsonError.stack[0];
+
+		// Frame number should be 0 (first frame)
+		assert.strictEqual(frame.frame, 0, 'First frame should be numbered 0');
+
+		// Address should be a valid hex string
+		assert.ok(frame.address.startsWith('0x'), 'Address should start with 0x');
+		assert.ok(frame.address.length > 3, 'Address should have more than just 0x');
+
+		// Symbol should contain meaningful information
+		assert.ok(frame.symbol.length > 0, 'Symbol should not be empty');
+
+		// Platform-specific checks for meaningful function names
+		const platform = getPlatform();
+
+		if (platform === 'linux' || platform === 'aarch64') {
+			// On Linux ARM64, we should get either:
+			// 1. Real mangled C++ function names (starting with _Z)
+			// 2. Module names in angle brackets
+			// 3. Address fallbacks
+			const isMangled = frame.symbol.startsWith('_Z');
+			const isModule = frame.symbol.startsWith('<') && frame.symbol.endsWith('>');
+			const isAddress = /^0x[0-9a-f]+$/i.test(frame.symbol);
+
+			assert.ok(isMangled || isModule || isAddress,
+				`Linux symbol should be mangled function, module name, or address, got: ${frame.symbol}`);
+
+			// If it's a mangled function, it should contain segfault-related symbols
+			if (isMangled) {
+				// Should be related to segfault functions
+				assert.ok(frame.symbol.includes('segfault') || frame.symbol.includes('Stack'),
+					`Mangled function should reference segfault functionality, got: ${frame.symbol}`);
+			}
+
+			// If it's a module, should be our native module
+			if (isModule) {
+				assert.ok(frame.symbol.includes('vlad_fresha_segfault_handler.node'),
+					`Module should be our native module, got: ${frame.symbol}`);
+			}
+		} else if (platform === 'windows') {
+			// On Windows, we expect module and function information
+			// Should not be generic placeholders
+			assert.ok(!frame.symbol.includes('<unknown>'), 'Windows should not have unknown symbols');
+			assert.ok(!frame.symbol.includes('<no_stack_trace_available>'), 'Should have stack trace available');
+		} else if (platform === 'osx') {
+			// On macOS, we expect detailed backtrace symbols
+			// Should not be generic placeholders
+			assert.ok(!frame.symbol.includes('<unknown>'), 'macOS should not have unknown symbols');
+			assert.ok(!frame.symbol.includes('<no_stack_trace_available>'), 'Should have stack trace available');
+
+			// macOS backtrace often includes module paths or function names
+			const hasModuleInfo = frame.symbol.includes('.dylib') || frame.symbol.includes('.node') ||
+								 frame.symbol.includes('node') || frame.symbol.includes('0x');
+			assert.ok(hasModuleInfo, `macOS symbol should contain module or address info, got: ${frame.symbol}`);
+		}
+
+		// Ensure we're not getting fallback error messages
+		assert.ok(!frame.symbol.includes('_stack_walk_failed'), 'Should not have stack walk failure');
+		assert.ok(!frame.symbol.includes('simple_fallback'), 'Should not have simple fallback');
+	});
+
 	// Test other exception types in JSON format
 	if (['windows', 'linux'].includes(getPlatform())) {
 		it('outputs JSON for division by zero', async () => {
@@ -187,6 +256,38 @@ describe('Plain Text Output Format', () => {
 		// Should not be JSON format
 		const jsonError = parseJsonError(response);
 		assert.strictEqual(jsonError, null, 'Should not contain JSON output');
+	});
+
+	it('traditional stack trace contains function symbols', async () => {
+		let response = await runAndGetErrorWithFormat('causeSegfault', false);
+
+		// Should contain basic crash information
+		const platform = getPlatform();
+		const expectedSignal = platform === 'windows' ? 'ACCESS_VIOLATION' : 'SIGSEGV';
+		assert.ok(response.includes(`received ${expectedSignal}`), 'Should contain signal name');
+		assert.ok(response.includes('PID'), 'Should contain process ID');
+
+		// Should contain stack trace information
+		// Most platforms should provide some form of stack trace in plain text mode
+		if (platform === 'linux' || platform === 'aarch64') {
+			// On Linux, traditional mode uses backtrace_symbols_fd or libunwind
+			// Should contain addresses or function names
+			const hasAddresses = /0x[0-9a-f]+/i.test(response);
+			const hasSymbols = response.includes('segfault') || response.includes('vlad_fresha_segfault_handler');
+
+			// Should have either addresses or symbols (or both)
+			assert.ok(hasAddresses || hasSymbols,
+				`Linux traditional output should contain addresses or symbols, got: ${response.substring(0, 500)}`);
+		} else if (platform === 'osx') {
+			// On macOS, backtrace should provide detailed information
+			const hasBacktrace = response.includes('0x') || response.includes('.dylib') || response.includes('node');
+			assert.ok(hasBacktrace,
+				`macOS should provide backtrace information, got: ${response.substring(0, 500)}`);
+		}
+
+		// Should not contain fallback error messages in traditional output
+		assert.ok(!response.includes('no_stack_trace_available'), 'Should have stack trace available');
+		assert.ok(!response.includes('stack_walk_failed'), 'Stack walking should not fail');
 	});
 });
 
