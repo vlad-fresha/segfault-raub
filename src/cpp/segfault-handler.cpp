@@ -50,6 +50,9 @@ namespace segfault {
 // Configuration: true for JSON output, false for plain text output
 bool useJsonOutput = false;
 
+// Signal handler recursion protection
+static volatile sig_atomic_t in_signal_handler = 0;
+
 #ifdef _WIN32
 	constexpr auto GETPID = _getpid;
 	#define SEGFAULT_HANDLER LONG CALLBACK handleSignal(PEXCEPTION_POINTERS info)
@@ -349,14 +352,14 @@ static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address, voi
 	}
 
 #elif HAVE_LIBUNWIND_H
-	// ARM64 Alpine: Simplified but robust stack unwinding
-	// Start with the crash address itself, then try to get caller information
+	// Libunwind-based stack unwinding for Alpine/musl (ARM64 and x86_64)
+	// Use simplified, signal-safe approach to avoid recursive crashes
 
 	bool wrote_any_frame = false;
 
-	// First, try to resolve the crash address directly
-	// On ARM64, we want to capture the actual point where the segfault occurred
 	#ifdef __aarch64__
+	// ARM64-specific implementation with signal context and assembly
+	// First, try to resolve the crash address directly
 	void* crash_ip = nullptr;
 
 	// Try to get the actual crash location from signal context
@@ -496,11 +499,96 @@ static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address, voi
 			}
 		}
 	}
+	#elif defined(__x86_64__) || defined(_M_X64)
+	// x86_64-specific implementation: Use signal-safe approach with minimal libunwind
+	// Avoid complex libunwind API calls that cause recursive segfaults in signal handlers
+
+	void* crash_ip = nullptr;
+
+	// Try to get the crash location from signal context
+	#if defined(__linux__)
+	if (context) {
+		ucontext_t* uctx = (ucontext_t*)context;
+		// On x86_64, RIP (instruction pointer) is in uc_mcontext.gregs[REG_RIP]
+		#ifdef REG_RIP
+		crash_ip = (void*)uctx->uc_mcontext.gregs[REG_RIP];
+		#endif
+	}
+	#endif
+
+	// Fallback: Skip dangerous assembly in signal handler on x86_64
+	// The frame pointer operations can cause secondary segfaults
+	if (!crash_ip) {
+		// Use a safe fallback address instead of risky frame pointer access
+		crash_ip = __builtin_return_address(0);
+	}
+
+	if (crash_ip) {
+		Dl_info dlinfo;
+		if (dladdr(crash_ip, &dlinfo)) {
+			wrote_any_frame = true;
+
+			write(STDERR_FD, "{\"frame\":0,\"address\":\"", strlen("{\"frame\":0,\"address\":\""));
+
+			char addr_hex[32];
+			int hex_len = snprintf(addr_hex, sizeof(addr_hex), "0x%lx", (uintptr_t)crash_ip);
+			write(STDERR_FD, addr_hex, hex_len);
+
+			write(STDERR_FD, "\",\"symbol\":\"", strlen("\",\"symbol\":\""));
+
+			if (dlinfo.dli_sname && dlinfo.dli_sname[0] != '\0') {
+				// Write function name
+				const char* symbol_ptr = dlinfo.dli_sname;
+				int symbol_len = 0;
+				while (*symbol_ptr && symbol_len < 100) {
+					if (*symbol_ptr == '"' || *symbol_ptr == '\\') {
+						write(STDERR_FD, "\\", 1);
+					}
+					write(STDERR_FD, symbol_ptr, 1);
+					symbol_ptr++;
+					symbol_len++;
+				}
+
+				// Add offset if available
+				if (dlinfo.dli_saddr && (uintptr_t)dlinfo.dli_saddr <= (uintptr_t)crash_ip) {
+					uintptr_t offset = (uintptr_t)crash_ip - (uintptr_t)dlinfo.dli_saddr;
+					if (offset > 0 && offset < 0x100000) {
+						char offset_buffer[32];
+						int offset_len = snprintf(offset_buffer, sizeof(offset_buffer), " + %zu", offset);
+						write(STDERR_FD, offset_buffer, offset_len);
+					}
+				}
+			} else if (dlinfo.dli_fname && dlinfo.dli_fname[0] != '\0') {
+				// No function name, use module name
+				write(STDERR_FD, "<", 1);
+				const char* filename = strrchr(dlinfo.dli_fname, '/');
+				const char* basename = filename ? filename + 1 : dlinfo.dli_fname;
+
+				int name_len = 0;
+				while (*basename && name_len < 50) {
+					write(STDERR_FD, basename, 1);
+					basename++;
+					name_len++;
+				}
+				write(STDERR_FD, ">", 1);
+			} else {
+				write(STDERR_FD, "unknown", strlen("unknown"));
+			}
+
+			write(STDERR_FD, "\"}", strlen("\"}"));
+		}
+	}
 	#endif
 
 	// Fallback if no frames were obtained
 	if (!wrote_any_frame) {
+		#ifdef __aarch64__
 		const char* fallback = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<arm64_simple_fallback>\"}";
+		#elif defined(__x86_64__) || defined(_M_X64)
+		const char* fallback = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<x86_64_simple_fallback>\"}";
+		#else
+		const char* fallback = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<libunwind_fallback>\"}";
+		#endif
 		write(STDERR_FD, fallback, strlen(fallback));
 	}
 #else
@@ -534,14 +622,8 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 		close(fd);
 	}
 #elif HAVE_LIBUNWIND_H
-	// Use libunwind for stack unwinding (better for Alpine/musl) with robust error handling
-	unw_cursor_t cursor;
-	unw_context_t context;
-	unw_word_t ip, sp, off;
-	char symbol[256];
-	int frame = 0;
+	// Use libunwind for stack unwinding (better for Alpine/musl) with platform-specific safety
 	constexpr int STDERR_FD = 2;
-
 	const char* header = "Stack trace (libunwind):\n";
 	write(STDERR_FD, header, strlen(header));
 
@@ -549,6 +631,22 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 	if (fd > 0) {
 		write(fd, header, strlen(header));
 	}
+
+	#if defined(__x86_64__) && !defined(__aarch64__)
+	// On x86_64, avoid full libunwind API in signal handlers due to async-signal-safety issues
+	// Use simplified approach similar to backtrace
+	const char* safety_msg = " 0: <x86_64_signal_safe_fallback> (libunwind disabled in signal handler)\n";
+	write(STDERR_FD, safety_msg, strlen(safety_msg));
+	if (fd > 0) {
+		write(fd, safety_msg, strlen(safety_msg));
+	}
+	#else
+	// On ARM64 and other platforms, attempt to use libunwind with error checking
+	unw_cursor_t cursor;
+	unw_context_t context;
+	unw_word_t ip, sp, off;
+	char symbol[256];
+	int frame = 0;
 
 	// Initialize libunwind with error checking
 	int getcontext_ret = unw_getcontext(&context);
@@ -623,6 +721,7 @@ static inline void _writeStackTrace(std::ofstream &outfile, uint32_t signalId) {
 			}
 		}
 	}
+	#endif  // End of ARM64 libunwind section
 
 	if (fd > 0) {
 		close(fd);
@@ -706,11 +805,19 @@ static inline void _closeLogFile(std::ofstream &outfile) {
 
 
 DBG_EXPORT SEGFAULT_HANDLER {
+	// Prevent recursive signal handling
+	if (in_signal_handler) {
+		// Already in signal handler - avoid infinite recursion
+		HANDLER_DONE;
+	}
+	in_signal_handler = 1;
+
 	auto signalAndAdress = _getSignalAndAddress(info);
 	uint32_t signalId = signalAndAdress.first;
 	uint64_t address = signalAndAdress.second;
 
 	if (!_isSignalEnabled(signalId)) {
+		in_signal_handler = 0;
 		HANDLER_CANCEL;
 	}
 
@@ -732,6 +839,8 @@ DBG_EXPORT SEGFAULT_HANDLER {
 		_closeLogFile(outfile);
 	}
 
+	// Don't reset the flag - let the process terminate to avoid any chance of recursion
+	// in_signal_handler = 0;  // Keep the flag set to prevent any future signal handling
 	HANDLER_DONE;
 }
 
