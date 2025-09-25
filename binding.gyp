@@ -10,7 +10,7 @@
 			},
 		}, {
 			'variables': {
-				'use_libunwind': '<!(if [ "$USE_LIBUNWIND" = "true" ] || [ "$USE_LIBUNWIND" = "1" ]; then echo "true"; elif [ "$USE_LIBUNWIND" = "false" ] || [ "$USE_LIBUNWIND" = "0" ]; then echo "false"; else echo "true"; fi)',
+				'use_libunwind': '<!(if [ "$USE_LIBUNWIND" = "true" ] || [ "$USE_LIBUNWIND" = "1" ]; then echo "true"; elif [ "$USE_LIBUNWIND" = "false" ] || [ "$USE_LIBUNWIND" = "0" ]; then echo "false"; elif ldd --version 2>&1 | grep -q musl; then echo "true"; else echo "false"; fi)',
 			},
 		}],
 	],
@@ -22,6 +22,7 @@
 		],
 		'include_dirs': [
 			'<!@(node -p "require(\'node-addon-api\').include")',
+			'src/libunwind/include',
 		],
 		'cflags_cc': ['-std=c++17', '-fno-exceptions', '-Wall', '-Werror'],
 		'cflags': ['-O0', '-funwind-tables', '-fno-exceptions', '-Wall', '-Werror'],
