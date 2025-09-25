@@ -120,6 +120,31 @@ describe('JSON Output Format', () => {
 		assert.ok(Array.isArray(jsonError.stack));
 	});
 
+	it('includes detailed libunwind stack traces on Linux', async () => {
+		if (!['linux', 'aarch64'].includes(getPlatform())) {
+			return; // Skip on non-Linux platforms
+		}
+
+		let response = await runAndGetErrorWithFormat('causeSegfault', true);
+
+		// Should contain individual JSON stack frame objects
+		const lines = response.split('\n');
+		const stackFrameLines = lines.filter((line) =>
+			line.startsWith('{') &&
+			line.includes('"frame"') &&
+			!line.includes('"type":"segfault"')
+		);
+
+		assert.ok(stackFrameLines.length > 0, 'Should have individual stack frame JSON objects');
+
+		// Parse and validate first stack frame
+		const firstFrame = JSON.parse(stackFrameLines[0]);
+		assert.ok(typeof firstFrame.frame === 'number');
+		assert.ok(typeof firstFrame.address === 'string');
+		assert.ok(typeof firstFrame.symbol === 'string');
+		assert.ok(firstFrame.address.startsWith('0x'), 'Address should be hex format');
+	});
+
 	it('includes correct signal information in JSON', async () => {
 		let response = await runAndGetErrorWithFormat('causeSegfault', true);
 		const jsonError = parseJsonError(response);
