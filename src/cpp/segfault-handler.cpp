@@ -51,7 +51,11 @@ namespace segfault {
 bool useJsonOutput = false;
 
 // Signal handler recursion protection
-static volatile sig_atomic_t in_signal_handler = 0;
+#ifdef _WIN32
+static volatile int in_signal_handler = 0;  // Windows doesn't have sig_atomic_t
+#else
+static volatile sig_atomic_t in_signal_handler = 0;  // Unix/POSIX platforms
+#endif
 
 #ifdef _WIN32
 	constexpr auto GETPID = _getpid;
