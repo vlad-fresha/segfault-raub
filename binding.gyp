@@ -22,8 +22,8 @@
 		'include_dirs': [
 			'<!@(node -p "require(\'node-addon-api\').include")',
 		],
-		'cflags_cc': ['-std=c++17', '-fno-exceptions', '-Wall', '-Werror'],
-		'cflags': ['-O0', '-funwind-tables', '-fno-exceptions', '-Wall', '-Werror'],
+		'cflags_cc': ['-std=c++17', '-fno-exceptions', '-Wall', '-Werror', '-Wno-unused-result', '-Wno-unused-variable'],
+		'cflags': ['-O0', '-funwind-tables', '-fno-exceptions', '-Wall', '-Werror', '-Wno-unused-result', '-Wno-unused-variable'],
 		'conditions': [
 			['OS=="linux"', {
 				'defines': ['__linux__'],
