@@ -17,7 +17,10 @@
 #include <signal.h>
 #include <unistd.h>
 #include <dlfcn.h>
+#if defined(__linux__)
+#define _XOPEN_SOURCE 700
 #include <ucontext.h>
+#endif
 #ifdef __has_include
   #if __has_include(<execinfo.h>)
     #include <execinfo.h>
@@ -357,11 +360,13 @@ static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address, voi
 	void* crash_ip = nullptr;
 
 	// Try to get the actual crash location from signal context
+	#if defined(__linux__)
 	if (context) {
 		ucontext_t* uctx = (ucontext_t*)context;
 		// On ARM64, PC (program counter) is in uc_mcontext.pc
 		crash_ip = (void*)uctx->uc_mcontext.pc;
 	}
+	#endif
 
 	// Fallback: Get the link register (return address) if no context available
 	if (!crash_ip) {
@@ -432,11 +437,13 @@ static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address, voi
 	void* frame_fp = nullptr;
 
 	// Try to get frame pointer from signal context
+	#if defined(__linux__)
 	if (context) {
 		ucontext_t* uctx = (ucontext_t*)context;
 		// On ARM64, x29 is the frame pointer
 		frame_fp = (void*)uctx->uc_mcontext.regs[29];
 	}
+	#endif
 
 	// Fallback: Get current frame pointer if no context available
 	if (!frame_fp) {
@@ -709,7 +716,11 @@ DBG_EXPORT SEGFAULT_HANDLER {
 
 	if (useJsonOutput) {
 		// Write JSON stack trace to stderr
+		#ifdef _WIN32
+		_writeJsonStackTrace(signalId, address);
+		#else
 		_writeJsonStackTrace(signalId, address, unused);
+		#endif
 	} else {
 		// Write traditional output
 		std::ofstream outfile = _openLogFile();
@@ -763,7 +774,7 @@ DBG_EXPORT JS_METHOD(causeSegfault) { NAPI_ENV;
 DBG_EXPORT NO_INLINE void _divideInt() {
 	volatile int a = 42;
 	volatile int b = 0;
-	a /= b;
+	a = a / b;
 }
 
 
