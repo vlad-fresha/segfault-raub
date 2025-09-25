@@ -344,10 +344,99 @@ static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address) {
 	}
 
 #elif HAVE_LIBUNWIND_H
-	// Alpine Linux libunwind - use minimal safe approach to avoid crashes
-	// Just write one safe fallback frame since libunwind seems problematic in signal handlers
-	const char* alpine_frame = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<alpine_libunwind_disabled_in_signal_handler>\"}";
-	write(STDERR_FD, alpine_frame, strlen(alpine_frame));
+	// Use libunwind for stack unwinding with robust error handling
+	unw_cursor_t cursor;
+	unw_context_t context;
+	unw_word_t ip, sp, off;
+	char symbol[256];
+	int frame = 0;
+	bool first_frame = true;
+
+	// Initialize libunwind with error checking
+	int getcontext_ret = unw_getcontext(&context);
+	if (getcontext_ret != 0) {
+		const char* error_frame = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<libunwind_getcontext_failed>\"}";
+		write(STDERR_FD, error_frame, strlen(error_frame));
+	} else {
+		int init_ret = unw_init_local(&cursor, &context);
+		if (init_ret != 0) {
+			const char* error_frame = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<libunwind_init_failed>\"}";
+			write(STDERR_FD, error_frame, strlen(error_frame));
+		} else {
+			// Successfully initialized - unwind the stack
+			int step_ret;
+			bool frames_written = false;
+
+			while ((step_ret = unw_step(&cursor)) > 0 && frame < 32) {
+				if (!first_frame) {
+					const char* comma = ",";
+					write(STDERR_FD, comma, 1);
+				}
+				first_frame = false;
+				frames_written = true;
+
+				// Get registers with error handling
+				ip = 0;
+				sp = 0;
+				int ip_ret = unw_get_reg(&cursor, UNW_REG_IP, &ip);
+				unw_get_reg(&cursor, UNW_REG_SP, &sp);
+
+				// Format frame start
+				char frame_start[64];
+				int frame_start_len = snprintf(frame_start, sizeof(frame_start),
+					"{\"frame\":%d,\"address\":\"0x%lx\",\"symbol\":\"", frame, ip);
+				write(STDERR_FD, frame_start, frame_start_len);
+
+				// Get symbol name
+				symbol[0] = '\0';
+				int symbol_ret = unw_get_proc_name(&cursor, symbol, sizeof(symbol), &off);
+
+				if (symbol_ret == 0 && symbol[0] != '\0') {
+					// Write symbol with offset information
+					const char* symbol_ptr = symbol;
+					while (*symbol_ptr) {
+						if (*symbol_ptr == '"' || *symbol_ptr == '\\') {
+							const char* escape = "\\";
+							write(STDERR_FD, escape, 1);
+						}
+						write(STDERR_FD, symbol_ptr, 1);
+						symbol_ptr++;
+					}
+
+					// Add offset if available
+					if (off > 0) {
+						char offset_info[32];
+						int offset_len = snprintf(offset_info, sizeof(offset_info), " + %lu", off);
+						write(STDERR_FD, offset_info, offset_len);
+					}
+				} else if (ip_ret == 0) {
+					const char* unknown_with_addr = "<unknown>";
+					write(STDERR_FD, unknown_with_addr, strlen(unknown_with_addr));
+				} else {
+					const char* no_info = "<no_address_or_symbol>";
+					write(STDERR_FD, no_info, strlen(no_info));
+				}
+
+				const char* frame_end = "\"}";
+				write(STDERR_FD, frame_end, strlen(frame_end));
+				frame++;
+			}
+
+			// If we didn't write any frames, write a fallback
+			if (!frames_written) {
+				const char* no_frames = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<no_frames_unwound>\"}";
+				write(STDERR_FD, no_frames, strlen(no_frames));
+			} else if (step_ret < 0) {
+				// Add error frame if stepping failed
+				const char* comma = ",";
+				write(STDERR_FD, comma, 1);
+				char error_frame[128];
+				int error_len = snprintf(error_frame, sizeof(error_frame),
+					"{\"frame\":%d,\"address\":\"0x0\",\"symbol\":\"<unwind_step_error_%d>\"}", frame, step_ret);
+				write(STDERR_FD, error_frame, error_len);
+			}
+		}
+	}
 #else
 	const char* no_stack = "{\"frame\":0,\"address\":\"0x0\",\"symbol\":\"<no_stack_trace_available>\"}";
 	write(STDERR_FD, no_stack, strlen(no_stack));
