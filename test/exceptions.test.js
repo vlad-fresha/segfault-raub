@@ -179,7 +179,8 @@ describe('JSON Output Format', () => {
 			const isUnknown = frame.symbol === 'unknown' || frame.symbol === '<unknown>';
 
 			assert.ok(isMangled || isModule || isAddress || isUnknown,
-				`Linux symbol should be mangled function, module name, address, or unknown, got: ${frame.symbol}`);
+				'Linux symbol should be mangled function, module name, address, or unknown, ' +
+				`got: ${frame.symbol}`);
 
 			// If it's a mangled function, it should contain segfault-related symbols
 			if (isMangled) {
