@@ -1,7 +1,7 @@
 {
 	"author": "Luis Blanco <luisblanco1337@gmail.com>",
 	"name": "@vlad-fresha/segfault-raub",
-	"version": "2.3.2",
+	"version": "2.4.0",
 	"description": "Catches SIGSEGV and prints diagnostic information",
 	"main": "index.js",
 	"license": "MIT, BSD-3-Clause, BSD-2-Clause",
@@ -52,7 +52,6 @@
 	"devDependencies": {
 		"@eslint/js": "^9.3.0",
 		"@types/node": "^20.12.13",
-		"addon-tools-raub": "^8.0.0",
 		"eslint": "^9.3.0",
 		"node-addon-api": "^8.0.0",
 		"typescript": "^5.4.5"

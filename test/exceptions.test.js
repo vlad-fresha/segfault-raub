@@ -5,7 +5,17 @@ const { describe, it } = require('node:test');
 const util = require('node:util');
 const exec = util.promisify(require('node:child_process').exec);
 
-const { getPlatform } = require('addon-tools-raub');
+// Inline platform detection
+const getPlatform = () => {
+	const platformAndArch = `${process.platform}-${process.arch}`;
+	const platformNames = {
+		'win32-x64': 'windows',
+		'linux-x64': 'linux',
+		'darwin-x64': 'osx',
+		'linux-arm64': 'aarch64',
+	};
+	return platformNames[platformAndArch] || platformAndArch;
+};
 
 
 const runAndGetError = async (name) => {

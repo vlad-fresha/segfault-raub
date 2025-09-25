@@ -3,7 +3,17 @@
 const assert = require('node:assert').strict;
 const { describe, it } = require('node:test');
 
-const { getPlatform } = require('addon-tools-raub');
+// Inline platform detection
+const getPlatform = () => {
+	const platformAndArch = `${process.platform}-${process.arch}`;
+	const platformNames = {
+		'win32-x64': 'windows',
+		'linux-x64': 'linux',
+		'darwin-x64': 'osx',
+		'linux-arm64': 'aarch64',
+	};
+	return platformNames[platformAndArch] || platformAndArch;
+};
 const Segfault = require('..');
 
 
