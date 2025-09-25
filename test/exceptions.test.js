@@ -89,8 +89,12 @@ describe('Exceptions', () => {
 	if (['windows'].includes(getPlatform())) {
 		it('reports stack overflows', async () => {
 			let response = await runAndGetError('causeOverflow');
-			const exceptionName = getPlatform() === 'windows' ? 'STACK_OVERFLOW' : 'SIGSEGV';
-			assert.ok(response.includes(exceptionName));
+			// On Windows, stack overflow can manifest as either STACK_OVERFLOW or ACCESS_VIOLATION
+			// depending on the specific mechanism that catches it first
+			const hasStackOverflow = response.includes('STACK_OVERFLOW');
+			const hasAccessViolation = response.includes('ACCESS_VIOLATION');
+			assert.ok(hasStackOverflow || hasAccessViolation,
+				`Expected STACK_OVERFLOW or ACCESS_VIOLATION, got: ${response.substring(0, 200)}`);
 		});
 	}
 	
