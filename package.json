@@ -46,6 +46,7 @@
 		"url": "git+https://github.com/vlad-fresha/segfault-raub.git"
 	},
 	"dependencies": {
+		"node-addon-api": "^8.5.0",
 		"node-gyp": "^11.4.2",
 		"pkg-prebuilds": "^1.0.0"
 	},
@@ -53,7 +54,6 @@
 		"@eslint/js": "^9.3.0",
 		"@types/node": "^20.12.13",
 		"eslint": "^9.3.0",
-		"node-addon-api": "^8.0.0",
 		"typescript": "^5.4.5"
 	},
 	"packageManager": "npm@10.8.2"
