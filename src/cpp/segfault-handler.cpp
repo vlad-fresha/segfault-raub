@@ -16,6 +16,7 @@
 #else
 #include <signal.h>
 #include <unistd.h>
+#include <dlfcn.h>
 #ifdef __has_include
   #if __has_include(<execinfo.h>)
     #include <execinfo.h>
@@ -344,9 +345,9 @@ static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address) {
 	}
 
 #elif HAVE_LIBUNWIND_H
-	// ARM64 Alpine libunwind - ultra-minimal approach to avoid signal handler issues
+	// ARM64 Alpine libunwind with safe symbol resolution using dladdr()
 	// Problem: unw_get_proc_name() can hang/crash in signal handlers on ARM64 Alpine
-	// Solution: Get addresses only, no symbol resolution
+	// Solution: Use libunwind for addresses, dladdr() for safe symbol resolution
 
 	unw_cursor_t cursor;
 	unw_context_t context;
@@ -358,11 +359,69 @@ static inline void _writeJsonStackTrace(uint32_t signalId, uint64_t address) {
 		// Get current frame IP only - no stepping which can hang on ARM64
 		if (unw_get_reg(&cursor, UNW_REG_IP, &ip) == 0 && ip != 0) {
 			got_frame = true;
-			// Write single frame with address only
-			char frame_buffer[128];
-			int frame_len = snprintf(frame_buffer, sizeof(frame_buffer),
-				"{\"frame\":0,\"address\":\"0x%lx\",\"symbol\":\"<libunwind_arm64_alpine_single_frame>\"}", ip);
-			write(STDERR_FD, frame_buffer, frame_len);
+
+			// Write frame start
+			write(STDERR_FD, "{\"frame\":0,\"address\":\"0x", strlen("{\"frame\":0,\"address\":\"0x"));
+
+			// Write hex address
+			char addr_buffer[32];
+			int addr_len = snprintf(addr_buffer, sizeof(addr_buffer), "%lx", ip);
+			write(STDERR_FD, addr_buffer, addr_len);
+
+			write(STDERR_FD, "\",\"symbol\":\"", strlen("\",\"symbol\":\""));
+
+			// Use dladdr for safe symbol resolution in signal handlers
+			Dl_info dlinfo;
+			if (dladdr((void*)ip, &dlinfo)) {
+				// Successfully resolved symbol with dladdr
+				if (dlinfo.dli_sname && dlinfo.dli_sname[0] != '\0') {
+					// Write symbol name with proper JSON escaping
+					const char* symbol_ptr = dlinfo.dli_sname;
+					int symbol_len = 0;
+					while (*symbol_ptr && symbol_len < 60) { // Limit length for safety
+						if (*symbol_ptr == '"' || *symbol_ptr == '\\') {
+							write(STDERR_FD, "\\", 1);
+						}
+						write(STDERR_FD, symbol_ptr, 1);
+						symbol_ptr++;
+						symbol_len++;
+					}
+
+					// Add offset if we can calculate it safely
+					if (dlinfo.dli_saddr && (uintptr_t)dlinfo.dli_saddr <= ip) {
+						uintptr_t offset = ip - (uintptr_t)dlinfo.dli_saddr;
+						if (offset > 0 && offset < 0x10000) { // Reasonable offset
+							char offset_buffer[32];
+							int offset_len = snprintf(offset_buffer, sizeof(offset_buffer), " + %zu", offset);
+							write(STDERR_FD, offset_buffer, offset_len);
+						}
+					}
+				} else if (dlinfo.dli_fname && dlinfo.dli_fname[0] != '\0') {
+					// No symbol name, but we have module name
+					write(STDERR_FD, "<", 1);
+					const char* filename = strrchr(dlinfo.dli_fname, '/');
+					const char* basename = filename ? filename + 1 : dlinfo.dli_fname;
+
+					// Write basename with length limit
+					int name_len = 0;
+					while (*basename && name_len < 40) {
+						if (*basename == '"' || *basename == '\\') {
+							write(STDERR_FD, "\\", 1);
+						}
+						write(STDERR_FD, basename, 1);
+						basename++;
+						name_len++;
+					}
+					write(STDERR_FD, ">", 1);
+				} else {
+					write(STDERR_FD, "<dladdr_no_symbol>", strlen("<dladdr_no_symbol>"));
+				}
+			} else {
+				// dladdr failed, use address-only fallback
+				write(STDERR_FD, "<unknown>", strlen("<unknown>"));
+			}
+
+			write(STDERR_FD, "\"}", strlen("\"}"));
 		}
 	}
 
