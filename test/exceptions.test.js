@@ -47,7 +47,7 @@ const parseJsonError = (response) => {
 		if (line.startsWith('{') && line.includes('"type":"segfault"')) {
 			try {
 				return JSON.parse(line);
-			} catch (e) {
+			} catch (_e) {
 				// Continue searching if JSON parse fails
 			}
 		}
@@ -194,18 +194,27 @@ describe('Output Format Configuration', () => {
 	it('can get and set output format', async () => {
 		try {
 			// Helper to strip ANSI escape codes
+			// eslint-disable-next-line no-control-regex
 			const stripAnsi = (str) => str.replace(/\x1B\[[0-9;]*m/g, '');
 
 			// Test getting default format (should be false/plain text)
-			const { stdout: defaultFormat } = await exec('node -e "console.log(require(\\".\\").getOutputFormat())"');
+			const { stdout: defaultFormat } = await exec(
+				'node -e "console.log(require(\\".\\").getOutputFormat())"'
+			);
 			assert.strictEqual(stripAnsi(defaultFormat.trim()), 'false');
 
 			// Test setting to JSON
-			const { stdout: jsonFormat } = await exec('node -e "const sf = require(\\".\\"); sf.setOutputFormat(true); console.log(sf.getOutputFormat())"');
+			const { stdout: jsonFormat } = await exec(
+				'node -e "const sf = require(\\".\\"); ' +
+				'sf.setOutputFormat(true); console.log(sf.getOutputFormat())"'
+			);
 			assert.strictEqual(stripAnsi(jsonFormat.trim()), 'true');
 
 			// Test setting back to plain text
-			const { stdout: plainFormat } = await exec('node -e "const sf = require(\\".\\"); sf.setOutputFormat(false); console.log(sf.getOutputFormat())"');
+			const { stdout: plainFormat } = await exec(
+				'node -e "const sf = require(\\".\\"); ' +
+				'sf.setOutputFormat(false); console.log(sf.getOutputFormat())"'
+			);
 			assert.strictEqual(stripAnsi(plainFormat.trim()), 'false');
 		} catch (error) {
 			// These tests don't cause crashes, so they should succeed

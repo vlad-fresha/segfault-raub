@@ -1,12 +1,15 @@
 'use strict';
 
+/* eslint-env node */
+/* global setTimeout */
+
 // Example demonstrating signal configuration with JSON output
 const {
-  setSignal, setOutputFormat,
-  SIGSEGV, SIGILL, SIGFPE, SIGTRAP,
-  EXCEPTION_ACCESS_VIOLATION, EXCEPTION_ILLEGAL_INSTRUCTION,
-  EXCEPTION_INT_DIVIDE_BY_ZERO, EXCEPTION_BREAKPOINT,
-  causeSegfault, causeIllegal
+	setSignal, setOutputFormat,
+	SIGSEGV, SIGILL, SIGTRAP,
+	EXCEPTION_ACCESS_VIOLATION, EXCEPTION_ILLEGAL_INSTRUCTION,
+	EXCEPTION_BREAKPOINT,
+	causeIllegal
 } = require('..');
 
 console.log('=== Signal Configuration with JSON Output Example ===\n');
@@ -39,5 +42,5 @@ console.log('EXCEPTION_BREAKPOINT:', EXCEPTION_BREAKPOINT);
 
 console.log('\nTriggering illegal instruction (should produce JSON output)...');
 setTimeout(() => {
-  causeIllegal();
+	causeIllegal();
 }, 2000);
