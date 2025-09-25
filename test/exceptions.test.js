@@ -184,8 +184,8 @@ describe('JSON Output Format', () => {
 									 frame.symbol.includes('[');
 
 			assert.ok(isMangled || isModule || isAddress || isUnknown || isBacktraceFormat,
-				'Linux symbol should be mangled function, module name, address, unknown, or backtrace format, ' +
-				`got: ${frame.symbol}`);
+				'Linux symbol should be mangled function, module name, address, unknown, ' +
+				`or backtrace format, got: ${frame.symbol}`);
 
 			// If it's a mangled function, it should contain segfault-related symbols (be flexible)
 			if (isMangled) {
